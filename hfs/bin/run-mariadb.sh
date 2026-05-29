@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# shellcheck disable=SC1091
+# shellcheck disable=SC1090
 source "${COZE_ENV_FILE:-/app/.env}"
 
 DATA_DIR="${DATA_DIR:-/data/coze}"

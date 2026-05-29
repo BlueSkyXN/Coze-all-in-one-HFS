@@ -16,6 +16,16 @@ FROM ${ELASTICSEARCH_IMAGE}
 
 ARG COZE_GIT_REF=v0.5.1
 ARG TARGETARCH
+ARG DENO_VERSION=2.4.5
+ARG DENO_SHA256_AMD64=
+ARG DENO_SHA256_ARM64=
+ARG ATLAS_INSTALL_URL=https://atlasgo.sh
+ARG ATLAS_INSTALL_SHA256=
+ARG INSTALL_ATLAS=true
+ARG MINIO_SHA256_AMD64=
+ARG MINIO_SHA256_ARM64=
+ARG MC_SHA256_AMD64=
+ARG MC_SHA256_ARM64=
 
 LABEL org.opencontainers.image.title="Coze all-in-one HFS" \
       org.opencontainers.image.description="Hugging Face Docker Space wrapper for Coze Studio" \
@@ -64,33 +74,69 @@ COPY --from=etcd /opt/bitnami/etcd /opt/bitnami/etcd
 COPY --from=milvus /milvus /milvus
 
 RUN set -eux; \
+    verify_sha256() { \
+      expected="$1"; \
+      path="$2"; \
+      if [ -n "$expected" ]; then \
+        echo "$expected  $path" | sha256sum -c -; \
+      else \
+        echo "[build] checksum not set for $path; development build only"; \
+      fi; \
+    }; \
     if ! command -v deno >/dev/null 2>&1; then \
       arch="${TARGETARCH:-amd64}"; \
       case "$arch" in \
-        amd64) deno_arch="x86_64-unknown-linux-gnu" ;; \
-        arm64) deno_arch="aarch64-unknown-linux-gnu" ;; \
+        amd64) deno_arch="x86_64-unknown-linux-gnu"; deno_sha="$DENO_SHA256_AMD64" ;; \
+        arm64) deno_arch="aarch64-unknown-linux-gnu"; deno_sha="$DENO_SHA256_ARM64" ;; \
         *) echo "Unsupported TARGETARCH=$arch for Deno download" >&2; exit 1 ;; \
       esac; \
-      curl -fsSL "https://github.com/denoland/deno/releases/download/v2.4.5/deno-${deno_arch}.zip" -o /tmp/deno.zip; \
+      curl -fsSL "https://github.com/denoland/deno/releases/download/v${DENO_VERSION}/deno-${deno_arch}.zip" -o /tmp/deno.zip; \
+      verify_sha256 "$deno_sha" /tmp/deno.zip; \
       unzip -q /tmp/deno.zip -d /usr/local/bin; \
       rm -f /tmp/deno.zip; \
       chmod +x /usr/local/bin/deno; \
     fi
 
 # Atlas CLI is used by Coze's official MySQL bootstrap flow. Keep it optional but available.
-RUN curl -fsSL https://atlasgo.sh | sh -s -- -y --community || true \
-    && if [ -x /root/.local/bin/atlas ]; then cp /root/.local/bin/atlas /usr/local/bin/atlas; fi
+RUN set -eux; \
+    verify_sha256() { \
+      expected="$1"; \
+      path="$2"; \
+      if [ -n "$expected" ]; then \
+        echo "$expected  $path" | sha256sum -c -; \
+      else \
+        echo "[build] checksum not set for $path; development build only"; \
+      fi; \
+    }; \
+    if [ "$INSTALL_ATLAS" = "true" ]; then \
+      curl -fsSL "$ATLAS_INSTALL_URL" -o /tmp/atlas-install.sh; \
+      verify_sha256 "$ATLAS_INSTALL_SHA256" /tmp/atlas-install.sh; \
+      sh /tmp/atlas-install.sh -y --community || true; \
+      rm -f /tmp/atlas-install.sh; \
+      if [ -x /root/.local/bin/atlas ]; then cp /root/.local/bin/atlas /usr/local/bin/atlas; fi; \
+    fi
 
 # MinIO fallback is included because Milvus and Coze both expect object storage.
 RUN set -eux; \
+    verify_sha256() { \
+      expected="$1"; \
+      path="$2"; \
+      if [ -n "$expected" ]; then \
+        echo "$expected  $path" | sha256sum -c -; \
+      else \
+        echo "[build] checksum not set for $path; development build only"; \
+      fi; \
+    }; \
     arch="${TARGETARCH:-amd64}"; \
     case "$arch" in \
-      amd64) minio_arch="amd64" ;; \
-      arm64) minio_arch="arm64" ;; \
+      amd64) minio_arch="amd64"; minio_sha="$MINIO_SHA256_AMD64"; mc_sha="$MC_SHA256_AMD64" ;; \
+      arm64) minio_arch="arm64"; minio_sha="$MINIO_SHA256_ARM64"; mc_sha="$MC_SHA256_ARM64" ;; \
       *) echo "Unsupported TARGETARCH=$arch for MinIO download" >&2; exit 1 ;; \
     esac; \
     curl -fsSL "https://dl.min.io/server/minio/release/linux-${minio_arch}/minio" -o /usr/local/bin/minio; \
     curl -fsSL "https://dl.min.io/client/mc/release/linux-${minio_arch}/mc" -o /usr/local/bin/mc; \
+    verify_sha256 "$minio_sha" /usr/local/bin/minio; \
+    verify_sha256 "$mc_sha" /usr/local/bin/mc; \
     chmod +x /usr/local/bin/minio /usr/local/bin/mc
 
 RUN set -eux; \

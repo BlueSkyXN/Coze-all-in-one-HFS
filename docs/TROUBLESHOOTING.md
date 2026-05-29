@@ -50,7 +50,7 @@ curl -fsS https://blueskyxn-coze-all-in-one-hfs.hf.space/_ops/healthz
 - `mariadb=false`：DB 初始化失败或 datadir 权限异常。
 - `redis=false`：Redis 未启动，检查 Supervisor logs。
 - `nats=false`：NATS JetStream 未启动，检查 `/data/coze/nats` 权限。
-- `minio=false`：本地 MinIO fallback 未启动；如果 `ENABLE_LOCAL_MINIO=0`，不应检查该项。
+- `minio=false`：本地 MinIO fallback 未启动；如果 `ENABLE_LOCAL_MINIO=0`，ops 不检查本地 MinIO，但内置 Milvus 仍需要可访问的外部 `MINIO_ADDRESS`。
 - `etcd=false`：Milvus 依赖的 etcd 未启动。
 - `elasticsearch=false`：ES 未启动或 `analysis-smartcn` / index template 初始化失败。
 - `milvus=false`：Milvus standalone 未启动，先看 etcd/MinIO 依赖；如果日志出现 `libaio.so.1`、`libgomp.so.1` 或 `libopenblas.so.0`，说明 final image 缺 Milvus runtime 动态库。

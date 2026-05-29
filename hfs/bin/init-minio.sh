@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# shellcheck disable=SC1091
+# shellcheck disable=SC1090
 source "${COZE_ENV_FILE:-/app/.env}"
 
 if [ "${ENABLE_LOCAL_MINIO:-1}" != "1" ]; then
@@ -9,7 +9,10 @@ if [ "${ENABLE_LOCAL_MINIO:-1}" != "1" ]; then
   exit 0
 fi
 
-export MC_HOST_local="http://${MINIO_ROOT_USER:-minioadmin}:${MINIO_ROOT_PASSWORD:-minioadmin123}@127.0.0.1:9000"
+: "${MINIO_ROOT_USER:?MINIO_ROOT_USER must be set by render-env.sh}"
+: "${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD must be set by render-env.sh}"
+
+export MC_HOST_local="http://${MINIO_ROOT_USER}:${MINIO_ROOT_PASSWORD}@127.0.0.1:9000"
 
 for i in $(seq 1 90); do
   if mc ready local >/dev/null 2>&1; then

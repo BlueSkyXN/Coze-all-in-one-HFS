@@ -5,7 +5,7 @@ host="${1:?host required}"
 port="${2:?port required}"
 timeout="${3:-120}"
 
-for i in $(seq 1 "$timeout"); do
+for _ in $(seq 1 "$timeout"); do
   if nc -z "$host" "$port" >/dev/null 2>&1; then
     exit 0
   fi

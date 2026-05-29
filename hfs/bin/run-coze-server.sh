@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# shellcheck disable=SC1091
+# shellcheck disable=SC1090
 source "${COZE_ENV_FILE:-/app/.env}"
 
 /opt/coze-hfs/bin/wait-for.sh 127.0.0.1 "${MYSQL_PORT:-3306}" 180

@@ -124,4 +124,6 @@ BUILTIN_CM_OPENAI_MODEL=your-model-id
 - [docs/README.md](docs/README.md)：文档索引
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)：架构和路径边界
 - [docs/env-reference.md](docs/env-reference.md)：ENV 分类和同步规则
+- [docs/hfs-alignment.md](docs/hfs-alignment.md)：HFS Pattern A、runtime mode、Space root 和 release pin 合同
+- [docs/release-checklist.md](docs/release-checklist.md)：发布前检查、远端同步和 live runtime 收口清单
 - [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)：排障入口

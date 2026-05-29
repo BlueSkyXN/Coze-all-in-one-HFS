@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Load generated Coze env.
-# shellcheck disable=SC1091
+# shellcheck disable=SC1090
 source "${COZE_ENV_FILE:-/app/.env}"
 
 DATA_DIR="${DATA_DIR:-/data/coze}"
@@ -13,6 +13,32 @@ SCHEMA_SQL="${SCHEMA_SQL:-/opt/coze/bootstrap/schema.sql}"
 SCHEMA_HCL="${SCHEMA_HCL:-/opt/coze/bootstrap/opencoze_latest_schema.hcl}"
 BOOTSTRAP_MARKER="$MYSQL_DATA_DIR/.coze_bootstrap_done"
 MYSQLD_USER="${MYSQLD_USER:-user}"
+
+: "${MYSQL_DATABASE:?MYSQL_DATABASE must be set by render-env.sh}"
+: "${MYSQL_USER:?MYSQL_USER must be set by render-env.sh}"
+: "${MYSQL_PASSWORD:?MYSQL_PASSWORD must be set by render-env.sh}"
+
+validate_mysql_identifier() {
+  local key="$1"
+  local value="$2"
+  if [[ ! "$value" =~ ^[A-Za-z0-9_]+$ ]]; then
+    echo "[mysql-init] $key may only contain letters, numbers, and underscores" >&2
+    exit 1
+  fi
+}
+
+sql_string_literal() {
+  /usr/bin/python3 - "$1" <<'PY'
+import sys
+
+value = sys.argv[1].replace("\\", "\\\\").replace("'", "''")
+print("'" + value + "'")
+PY
+}
+
+validate_mysql_identifier MYSQL_DATABASE "$MYSQL_DATABASE"
+validate_mysql_identifier MYSQL_USER "$MYSQL_USER"
+MYSQL_PASSWORD_SQL="$(sql_string_literal "$MYSQL_PASSWORD")"
 
 mkdir -p "$MYSQL_DATA_DIR" "$DATA_DIR/run" "$DATA_DIR/logs"
 if [ "$(id -u)" = "0" ]; then
@@ -72,8 +98,8 @@ mysql_root() {
 echo "[mysql-init] creating database/user"
 mysql_root <<SQL
 CREATE DATABASE IF NOT EXISTS \`${MYSQL_DATABASE}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER IF NOT EXISTS '${MYSQL_USER}'@'%' IDENTIFIED BY '${MYSQL_PASSWORD}';
-CREATE USER IF NOT EXISTS '${MYSQL_USER}'@'localhost' IDENTIFIED BY '${MYSQL_PASSWORD}';
+CREATE USER IF NOT EXISTS '${MYSQL_USER}'@'%' IDENTIFIED BY ${MYSQL_PASSWORD_SQL};
+CREATE USER IF NOT EXISTS '${MYSQL_USER}'@'localhost' IDENTIFIED BY ${MYSQL_PASSWORD_SQL};
 GRANT ALL PRIVILEGES ON \`${MYSQL_DATABASE}\`.* TO '${MYSQL_USER}'@'%';
 GRANT ALL PRIVILEGES ON \`${MYSQL_DATABASE}\`.* TO '${MYSQL_USER}'@'localhost';
 FLUSH PRIVILEGES;

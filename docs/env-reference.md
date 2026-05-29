@@ -17,7 +17,7 @@
 | --- | --- | --- | --- |
 | `DISABLE_USER_REGISTRATION` | `true` | `true` | 公开 Space 默认关闭注册。 |
 | `ALLOW_REGISTRATION_EMAIL` | 空 | 按需填写 | 只允许指定邮箱注册；含个人邮箱时可放本地台账，不写公开 PR 文案。 |
-| `ENABLE_LOCAL_MINIO` | `1` | P0/P1 可保留 `1` | 本地 MinIO fallback；真实上传建议外接 S3/TOS/ImageX。 |
+| `ENABLE_LOCAL_MINIO` | `1` | P0/P1 可保留 `1` | 本地 MinIO fallback；设为 `0` 时必须提供外部 object storage，并确保内置 Milvus 可访问 `MINIO_ADDRESS`。 |
 | `COZE_PUBLIC_URL` | 从 `SPACE_HOST` 推导 | `https://blueskyxn-coze-all-in-one-hfs.hf.space` | 公开 URL；自定义域名时显式覆盖。 |
 | `LOG_LEVEL` | `info` | `info` | Coze Server 日志级别。 |
 | `ES_ADDR` | `http://127.0.0.1:9200` | 默认不上传 | 内置 Elasticsearch；只有改用外部 ES/OpenSearch 时才覆盖。 |

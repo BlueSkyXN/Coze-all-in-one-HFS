@@ -52,8 +52,10 @@ local processes:
 | `ELASTICSEARCH_IMAGE` | `bitnamilegacy/elasticsearch:8.18.0` | runtime base image and local ES |
 | `ETCD_IMAGE` | `bitnamilegacy/etcd:3.5` | local etcd for Milvus |
 | `MILVUS_IMAGE` | `milvusdb/milvus:v2.5.10` | local vector store |
+| `DENO_VERSION` | `2.4.5` | Deno binary used by Coze runtime |
+| `ATLAS_INSTALL_URL` | `https://atlasgo.sh` | Optional Atlas installer URL |
 
-发布态应把镜像 digest、Coze git commit、下载 artifact checksum 明确 pin 住。本仓库当前默认值适合开发部署，不应被描述成生产级不可变 release。
+发布态应把镜像 digest、Coze git commit、下载 artifact checksum 明确 pin 住。Dockerfile 已支持 `DENO_SHA256_*`、`ATLAS_INSTALL_SHA256`、`MINIO_SHA256_*` 和 `MC_SHA256_*` build args；本仓库当前默认值适合开发部署，不应被描述成生产级不可变 release。
 
 Coze v0.5.1 的 bootstrap 文件包含 MySQL 8.0 专属 collation `utf8mb4_0900_ai_ci`。本仓库在 build 阶段把 `schema.sql` 和 Atlas HCL 规范化为 `utf8mb4_unicode_ci`，以保持 MariaDB 运行层可启动。
 

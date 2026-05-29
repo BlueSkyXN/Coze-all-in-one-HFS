@@ -1,4 +1,4 @@
-schema_version = 1
+schema_version = 2
 standard = "hfs-dev"
 pattern = "A"
 runtime_mode = "image-assembly"
@@ -7,23 +7,114 @@ hfs_dir = "."
 public_port = 7860
 canonical_health_endpoint = "/_ops/healthz"
 release_pin_required = true
-release_pin_surfaces = [
-  "COZE_SERVER_TAG=<pinned Coze server image tag>",
-  "COZE_WEB_TAG=<pinned Coze web image tag>",
-  "COZE_GIT_REF=<matching coze-dev/coze-studio git tag or commit>",
-  "ELASTICSEARCH_IMAGE=<pinned Elasticsearch image digest>",
-  "ETCD_IMAGE=<pinned etcd image digest>",
-  "MILVUS_IMAGE=<pinned Milvus image digest>",
-  "MinIO binary download URLs should be replaced by checksum-verified artifacts before a production release.",
-  "Deno binary download URL should be replaced by checksum-verified artifact before a production release.",
-]
 dev_mutable_sources_allowed = []
 required_files = [
   "README.md",
   "Dockerfile",
   "hfs-dev.toml",
   "hfs",
+  "hfs/AGENTS.md",
   "docs",
+  "docs/hfs-alignment.md",
+  "docs/release-checklist.md",
   "scripts",
+  "scripts/validate-hfs-contract.sh",
   "AGENTS.md",
 ]
+
+[[release_pins]]
+name = "COZE_SERVER_TAG"
+type = "image_tag"
+source = "Dockerfile ARG"
+current_dev_default = "0.5.1"
+required_for_release = true
+dev_mutable_default_allowed = false
+release_requires_digest = true
+notes = "Used as cozedev/coze-studio-server:${COZE_SERVER_TAG}; keep aligned with COZE_WEB_TAG and COZE_GIT_REF."
+
+[[release_pins]]
+name = "COZE_WEB_TAG"
+type = "image_tag"
+source = "Dockerfile ARG"
+current_dev_default = "0.5.1"
+required_for_release = true
+dev_mutable_default_allowed = false
+release_requires_digest = true
+notes = "Used as cozedev/coze-studio-web:${COZE_WEB_TAG}; keep aligned with COZE_SERVER_TAG and COZE_GIT_REF."
+
+[[release_pins]]
+name = "COZE_GIT_REF"
+type = "git_ref"
+source = "Dockerfile ARG"
+current_dev_default = "v0.5.1"
+required_for_release = true
+dev_mutable_default_allowed = false
+release_requires_commit_or_tag = true
+notes = "Controls upstream schema/config downloads from coze-dev/coze-studio."
+
+[[release_pins]]
+name = "ELASTICSEARCH_IMAGE"
+type = "image_ref"
+source = "Dockerfile ARG"
+current_dev_default = "bitnamilegacy/elasticsearch:8.18.0"
+required_for_release = true
+dev_mutable_default_allowed = false
+release_requires_digest = true
+
+[[release_pins]]
+name = "ETCD_IMAGE"
+type = "image_ref"
+source = "Dockerfile ARG"
+current_dev_default = "bitnamilegacy/etcd:3.5"
+required_for_release = true
+dev_mutable_default_allowed = false
+release_requires_digest = true
+
+[[release_pins]]
+name = "MILVUS_IMAGE"
+type = "image_ref"
+source = "Dockerfile ARG"
+current_dev_default = "milvusdb/milvus:v2.5.10"
+required_for_release = true
+dev_mutable_default_allowed = false
+release_requires_digest = true
+
+[[release_pins]]
+name = "DENO_VERSION"
+type = "artifact_version"
+source = "Dockerfile ARG"
+current_dev_default = "2.4.5"
+required_for_release = true
+dev_mutable_default_allowed = false
+release_requires_checksum = true
+checksum_args = ["DENO_SHA256_AMD64", "DENO_SHA256_ARM64"]
+
+[[release_pins]]
+name = "ATLAS_INSTALL_URL"
+type = "artifact_url"
+source = "Dockerfile ARG"
+current_dev_default = "https://atlasgo.sh"
+required_for_release = true
+dev_mutable_default_allowed = true
+release_requires_checksum = true
+checksum_args = ["ATLAS_INSTALL_SHA256"]
+
+[[release_pins]]
+name = "MINIO_BINARY_URL"
+type = "artifact_url"
+source = "Dockerfile hardcoded URL"
+current_dev_default = "https://dl.min.io/server/minio/release/linux-${minio_arch}/minio"
+required_for_release = true
+dev_mutable_default_allowed = true
+release_requires_checksum = true
+checksum_args = ["MINIO_SHA256_AMD64", "MINIO_SHA256_ARM64"]
+
+[[release_pins]]
+name = "MC_BINARY_URL"
+type = "artifact_url"
+source = "Dockerfile hardcoded URL"
+current_dev_default = "https://dl.min.io/client/mc/release/linux-${minio_arch}/mc"
+required_for_release = true
+dev_mutable_default_allowed = true
+release_requires_checksum = true
+checksum_args = ["MC_SHA256_AMD64", "MC_SHA256_ARM64"]
