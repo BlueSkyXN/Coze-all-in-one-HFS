@@ -54,7 +54,7 @@ curl -fsS https://blueskyxn-coze-all-in-one-hfs.hf.space/_ops/healthz
 - `etcd=false`：Milvus 依赖的 etcd 未启动。
 - `elasticsearch=false`：ES 未启动或 `analysis-smartcn` / index template 初始化失败。
 - `milvus=false`：Milvus standalone 未启动，先看 etcd/MinIO 依赖；如果日志出现 `libaio.so.1`、`libgomp.so.1` 或 `libopenblas.so.0`，说明 final image 缺 Milvus runtime 动态库。
-- `coze_server=false`：Coze Server 未监听 `8888`，继续看 ES、VectorStore、DB 或 model 初始化错误。
+- `coze_server=false`：Coze Server 未监听 `8888`，继续看 ES、VectorStore、DB 或 model 初始化错误；如果日志出现 `/app/opencoze: cannot execute: required file not found`，说明 Alpine/musl ABI 的 Coze server 二进制缺动态加载器。
 
 ## 登录或注册被拦
 

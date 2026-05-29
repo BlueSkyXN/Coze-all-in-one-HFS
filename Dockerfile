@@ -44,6 +44,7 @@ RUN install_packages \
       libopenblas0 \
       mariadb-client \
       mariadb-server \
+      musl \
       nats-server \
       netcat-openbsd \
       nginx \
@@ -134,6 +135,10 @@ RUN chmod +x /opt/coze-hfs/bin/*.sh \
     && LD_LIBRARY_PATH=/milvus/lib ldd /milvus/bin/milvus > /tmp/milvus.ldd \
     && cat /tmp/milvus.ldd \
     && ! grep -q "not found" /tmp/milvus.ldd \
+    && file /app/opencoze \
+    && ldd /app/opencoze > /tmp/opencoze.ldd \
+    && cat /tmp/opencoze.ldd \
+    && ! grep -q "not found" /tmp/opencoze.ldd \
     && test -x /usr/bin/tini \
     && test -x /usr/bin/python3 \
     && test -x /usr/sbin/nats-server \
