@@ -1,0 +1,11 @@
+.git
+.gitignore
+__pycache__
+*.pyc
+.DS_Store
+*.zip
+/data
+.env
+.env.local
+.data
+local
