@@ -30,7 +30,9 @@ mc mb --ignore-existing "local/${STORAGE_BUCKET:-opencoze}"
 if [ -n "${MINIO_DEFAULT_BUCKETS:-}" ]; then
   IFS=',' read -ra buckets <<< "${MINIO_DEFAULT_BUCKETS}"
   for b in "${buckets[@]}"; do
-    [ -n "$b" ] && mc mb --ignore-existing "local/$b" || true
+    if [ -n "$b" ]; then
+      mc mb --ignore-existing "local/$b" || true
+    fi
   done
 fi
 
