@@ -11,8 +11,11 @@ release_pin_surfaces = [
   "COZE_SERVER_TAG=<pinned Coze server image tag>",
   "COZE_WEB_TAG=<pinned Coze web image tag>",
   "COZE_GIT_REF=<matching coze-dev/coze-studio git tag or commit>",
-  "ALPINE_VERSION=<pinned Alpine base image version>",
+  "ELASTICSEARCH_IMAGE=<pinned Elasticsearch image digest>",
+  "ETCD_IMAGE=<pinned etcd image digest>",
+  "MILVUS_IMAGE=<pinned Milvus image digest>",
   "MinIO binary download URLs should be replaced by checksum-verified artifacts before a production release.",
+  "Deno binary download URL should be replaced by checksum-verified artifact before a production release.",
 ]
 dev_mutable_sources_allowed = []
 required_files = [

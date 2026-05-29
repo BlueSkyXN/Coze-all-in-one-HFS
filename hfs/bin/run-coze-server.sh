@@ -9,8 +9,12 @@ source "${COZE_ENV_FILE:-/app/.env}"
 /opt/coze-hfs/bin/wait-for.sh 127.0.0.1 4222 120
 
 if [ "${ENABLE_LOCAL_MINIO:-1}" = "1" ]; then
-  /opt/coze-hfs/bin/wait-for.sh 127.0.0.1 9000 120 || true
+  /opt/coze-hfs/bin/wait-for.sh 127.0.0.1 9000 180
 fi
+
+/opt/coze-hfs/bin/wait-for.sh 127.0.0.1 9200 300
+/opt/coze-hfs/bin/wait-for.sh 127.0.0.1 19530 300
+/opt/coze-hfs/bin/wait-for.sh 127.0.0.1 9091 300
 
 cd /app
 exec /app/opencoze

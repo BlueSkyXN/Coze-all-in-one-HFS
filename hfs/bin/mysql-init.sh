@@ -12,8 +12,12 @@ MYSQL_PID_FILE="${MYSQL_PID_FILE:-$DATA_DIR/run/mysql-init.pid}"
 SCHEMA_SQL="${SCHEMA_SQL:-/opt/coze/bootstrap/schema.sql}"
 SCHEMA_HCL="${SCHEMA_HCL:-/opt/coze/bootstrap/opencoze_latest_schema.hcl}"
 BOOTSTRAP_MARKER="$MYSQL_DATA_DIR/.coze_bootstrap_done"
+MYSQLD_USER="${MYSQLD_USER:-user}"
 
 mkdir -p "$MYSQL_DATA_DIR" "$DATA_DIR/run" "$DATA_DIR/logs"
+if [ "$(id -u)" = "0" ]; then
+  chown -R "$MYSQLD_USER:$MYSQLD_USER" "$MYSQL_DATA_DIR" "$DATA_DIR/run" "$DATA_DIR/logs"
+fi
 
 if [ -f "$BOOTSTRAP_MARKER" ]; then
   echo "[mysql-init] existing database bootstrap marker found; skipping init"
@@ -25,7 +29,7 @@ if [ ! -d "$MYSQL_DATA_DIR/mysql" ]; then
   mariadb-install-db \
     --datadir="$MYSQL_DATA_DIR" \
     --auth-root-authentication-method=normal \
-    --user="$(id -un)" \
+    --user="$MYSQLD_USER" \
     --skip-test-db
 fi
 
@@ -38,7 +42,8 @@ mariadbd \
   --bind-address="127.0.0.1" \
   --character-set-server=utf8mb4 \
   --collation-server=utf8mb4_unicode_ci \
-  --skip-networking=0 &
+  --skip-networking=0 \
+  --user="$MYSQLD_USER" &
 MYSQL_TMP_PID=$!
 
 cleanup() {

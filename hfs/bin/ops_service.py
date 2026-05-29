@@ -24,6 +24,9 @@ def health_payload() -> tuple[int, dict]:
         "mariadb": tcp_check("127.0.0.1", int(os.environ.get("MYSQL_PORT", "3306"))),
         "redis": tcp_check("127.0.0.1", 6379),
         "nats": tcp_check("127.0.0.1", 4222),
+        "etcd": tcp_check("127.0.0.1", 2379),
+        "elasticsearch": tcp_check("127.0.0.1", 9200),
+        "milvus": tcp_check("127.0.0.1", 19530),
         "coze_server": tcp_check("127.0.0.1", 8888),
         "data_dir": DATA_DIR.exists() and os.access(DATA_DIR, os.W_OK),
     }

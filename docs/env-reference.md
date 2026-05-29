@@ -8,8 +8,8 @@
 | --- | --- |
 | GitHub Variables | 未配置 |
 | GitHub Secrets | 未配置 |
-| Hugging Face Variables | 初始为空，部署时建议只设置非敏感运行策略 |
-| Hugging Face Secrets | 初始为空，模型/存储/检索等密钥按需设置 |
+| Hugging Face Variables | 已同步基础运行策略；外部 Provider 按需补充 |
+| Hugging Face Secrets | 当前未配置；模型/存储/检索等密钥按需设置 |
 
 ## 推荐 HF Variables
 
@@ -20,6 +20,8 @@
 | `ENABLE_LOCAL_MINIO` | `1` | P0/P1 可保留 `1` | 本地 MinIO fallback；真实上传建议外接 S3/TOS/ImageX。 |
 | `COZE_PUBLIC_URL` | 从 `SPACE_HOST` 推导 | `https://blueskyxn-coze-all-in-one-hfs.hf.space` | 公开 URL；自定义域名时显式覆盖。 |
 | `LOG_LEVEL` | `info` | `info` | Coze Server 日志级别。 |
+| `ES_ADDR` | `http://127.0.0.1:9200` | 默认不上传 | 内置 Elasticsearch；只有改用外部 ES/OpenSearch 时才覆盖。 |
+| `VECTOR_STORE_TYPE` | `milvus` | 默认不上传 | 内置 Milvus；只有改用 VikingDB/OceanBase/外部 Milvus 时才覆盖。 |
 
 ## 推荐 HF Secrets
 
@@ -52,9 +54,9 @@
 | `S3_BUCKET_ENDPOINT` | `https://bucket.example.com` | 公开 bucket endpoint 可放 Variable。 |
 | `S3_REGION` | `us-east-1` | S3 region。 |
 | `STORAGE_BUCKET` | `opencoze` | bucket 名若敏感则放 Secret。 |
-| `ES_ADDR` | `https://es.example.com` | 私有 endpoint 视敏感程度放 Secret。 |
+| `ES_ADDR` | `https://es.example.com` | 默认内置本地 ES；外部 endpoint 视敏感程度放 Secret。 |
 | `ES_VERSION` | `v8` | ES 版本。 |
-| `VECTOR_STORE_TYPE` | `vikingdb` | 知识库/RAG 向量库类型。 |
+| `VECTOR_STORE_TYPE` | `vikingdb` | 默认内置 `milvus`；外部向量库才覆盖。 |
 | `VIKING_DB_HOST` | `api-vikingdb.example.com` | 私有 endpoint 视敏感程度放 Secret。 |
 | `VIKING_DB_REGION` | `cn-beijing` | region。 |
 | `VIKING_DB_SCHEME` | `https` | scheme。 |

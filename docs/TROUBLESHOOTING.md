@@ -51,6 +51,9 @@ curl -fsS https://blueskyxn-coze-all-in-one-hfs.hf.space/_ops/healthz
 - `redis=false`：Redis 未启动，检查 Supervisor logs。
 - `nats=false`：NATS JetStream 未启动，检查 `/data/coze/nats` 权限。
 - `minio=false`：本地 MinIO fallback 未启动；如果 `ENABLE_LOCAL_MINIO=0`，不应检查该项。
+- `etcd=false`：Milvus 依赖的 etcd 未启动。
+- `elasticsearch=false`：ES 未启动或 `analysis-smartcn` / index template 初始化失败。
+- `milvus=false`：Milvus standalone 未启动，通常要继续看 etcd/MinIO 依赖。
 - `coze_server=false`：Coze Server 未监听 `8888`，继续看 ES、VectorStore、DB 或 model 初始化错误。
 
 ## 登录或注册被拦
@@ -105,7 +108,7 @@ STORAGE_BUCKET
 
 ## Knowledge/RAG 初始化失败
 
-Coze 知识库通常依赖 ES/OpenSearch、Embedding 和 Vector Store。若启动阶段强制初始化这些依赖，应外接 HTTPS endpoint，并配置对应 HF Variables/Secrets：
+Coze 启动阶段会初始化 ES 和 Vector Store。本包装仓默认内置 ES + Milvus；若改用外部托管服务，配置对应 HF Variables/Secrets：
 
 ```text
 ES_ADDR

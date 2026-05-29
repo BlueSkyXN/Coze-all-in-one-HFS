@@ -21,7 +21,7 @@ license: gpl-3.0
 - `cozedev/coze-studio-server:0.5.1`
 - `cozedev/coze-studio-web:0.5.1`
 - `coze-dev/coze-studio` 的 `v0.5.1` MySQL schema / Atlas schema
-- Alpine 运行层，内置 Nginx、Supervisor、MariaDB、Redis、NATS JetStream、可选 MinIO fallback
+- Elasticsearch 运行层，内置 Nginx、Supervisor、MariaDB、Redis、NATS JetStream、MinIO fallback、etcd、Milvus、Elasticsearch
 
 外部只暴露 Hugging Face 的单一端口 `7860`。Nginx 在容器内汇聚：
 
@@ -42,7 +42,10 @@ browser
 - MariaDB/MySQL-compatible：`127.0.0.1:3306`
 - Redis：`127.0.0.1:6379`
 - NATS JetStream：`127.0.0.1:4222`
-- MinIO fallback：`127.0.0.1:9000`，只用于基础演示
+- MinIO fallback：`127.0.0.1:9000`
+- etcd：`127.0.0.1:2379`
+- Elasticsearch：`127.0.0.1:9200`
+- Milvus：`127.0.0.1:19530`
 - Coze Server：`127.0.0.1:8888`
 - Nginx public listener：`0.0.0.0:7860`
 
@@ -51,8 +54,8 @@ browser
 - 模型 API
 - Embedding API
 - S3/TOS/ImageX 文件存储
-- Elasticsearch/OpenSearch-compatible endpoint
-- VikingDB/OceanBase/Milvus 等向量服务
+- 外部 Elasticsearch/OpenSearch-compatible endpoint
+- VikingDB/OceanBase/Milvus 等外部向量服务
 - OCR、rerank、plugin 相关第三方服务
 
 ## Health 与 Smoke
@@ -111,8 +114,8 @@ BUILTIN_CM_OPENAI_MODEL=your-model-id
 ## 已知限制
 
 - 官方 Coze Studio 主要面向 Docker Compose / Helm 部署，本仓库是 HFS 单容器包装，不是官方部署方式。
-- 当前数据库层使用 Alpine MariaDB 作为 MySQL-compatible 本地服务；如果上游 schema 使用 MySQL 8.4 专属特性，可能需要切到外部 MySQL 或后续改造 MySQL runtime。
-- Knowledge/RAG 相关能力通常需要外部 ES/OpenSearch、Embedding 和 Vector Store。未配置这些服务时，只应把启动、登录和基础 UI 视为 P0/P1 验证。
+- 当前数据库层使用 MariaDB 作为 MySQL-compatible 本地服务；如果上游 schema 使用 MySQL 8.4 专属特性，可能需要切到外部 MySQL 或后续改造 MySQL runtime。
+- Knowledge/RAG 相关能力已内置 ES + Milvus 的启动路径；真实知识库效果仍需要配置 Embedding、rerank、OCR 或外部托管向量服务。
 - 本地 MinIO fallback 不适合生产文件公开访问；真实上传、多模态和模型可读 URL 建议接 S3/TOS/ImageX。
 - 公开 Space 默认关闭注册：`DISABLE_USER_REGISTRATION=true`。
 

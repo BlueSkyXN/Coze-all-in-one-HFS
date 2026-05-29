@@ -31,7 +31,10 @@ local processes:
   - mariadbd:3306
   - redis-server:6379
   - nats-server:4222
-  - optional minio:9000
+  - minio:9000
+  - etcd:2379
+  - elasticsearch:9200
+  - milvus:19530
   - coze-server:8888
   - ops-service:8081
   - nginx:7860
@@ -46,7 +49,9 @@ local processes:
 | `COZE_SERVER_TAG` | `0.5.1` | `cozedev/coze-studio-server` image tag |
 | `COZE_WEB_TAG` | `0.5.1` | `cozedev/coze-studio-web` image tag |
 | `COZE_GIT_REF` | `v0.5.1` | schema and Atlas source ref |
-| `ALPINE_VERSION` | `3.22.0` | runtime base image |
+| `ELASTICSEARCH_IMAGE` | `bitnamilegacy/elasticsearch:8.18.0` | runtime base image and local ES |
+| `ETCD_IMAGE` | `bitnamilegacy/etcd:3.5` | local etcd for Milvus |
+| `MILVUS_IMAGE` | `milvusdb/milvus:v2.5.10` | local vector store |
 
 发布态应把镜像 digest、Coze git commit、下载 artifact checksum 明确 pin 住。本仓库当前默认值适合开发部署，不应被描述成生产级不可变 release。
 
@@ -59,6 +64,7 @@ local processes:
 /data/coze/redis
 /data/coze/nats
 /data/coze/minio
+/data/coze/elasticsearch
 /data/coze/logs
 /data/coze/run
 /data/coze/generated-secrets.env
@@ -74,6 +80,9 @@ local processes:
 - Redis
 - NATS JetStream
 - MinIO fallback
+- etcd
+- Elasticsearch
+- Milvus
 - Nginx
 - Supervisor
 - read-only ops-service
@@ -83,12 +92,12 @@ local processes:
 - 模型 API
 - Embedding API
 - S3/TOS/ImageX
-- ES/OpenSearch
-- VikingDB/OceanBase/Milvus
+- external ES/OpenSearch override
+- external VikingDB/OceanBase/Milvus override
 - OCR/rerank/plugin provider
 
 ## Ops Surface
 
-`/_ops/healthz`、`/_ops/readyz`、`/_ops/status` 只做只读健康检查。返回字段包括 `mariadb`、`redis`、`nats`、`minio`、`coze_server`、`data_dir`。
+`/_ops/healthz`、`/_ops/readyz`、`/_ops/status` 只做只读健康检查。返回字段包括 `mariadb`、`redis`、`nats`、`minio`、`etcd`、`elasticsearch`、`milvus`、`coze_server`、`data_dir`。
 
 禁止在 `/_ops` 增加写操作、shell、SQL、restart、delete、secret rotation 或配置修改。

@@ -137,6 +137,10 @@ emit MINIO_SK "${MINIO_ROOT_PASSWORD}"
 emit MINIO_ENDPOINT "127.0.0.1:9000"
 emit MINIO_API_HOST "${PUBLIC_URL}/local_storage"
 emit MINIO_USE_SSL "false"
+emit MINIO_ADDRESS "127.0.0.1:9000"
+emit MINIO_BUCKET_NAME "milvus"
+emit MINIO_ACCESS_KEY_ID "${MINIO_ROOT_USER:-cozehfs}"
+emit MINIO_SECRET_ACCESS_KEY "${MINIO_ROOT_PASSWORD}"
 
 emit TOS_ACCESS_KEY ""
 emit TOS_SECRET_KEY ""
@@ -148,8 +152,8 @@ emit S3_ENDPOINT ""
 emit S3_BUCKET_ENDPOINT ""
 emit S3_REGION ""
 
-# ES / search store. Leave empty unless user provides an HTTPS endpoint.
-emit ES_ADDR ""
+# ES / search store.
+emit ES_ADDR "http://127.0.0.1:9200"
 emit ES_VERSION "v8"
 emit ES_USERNAME ""
 emit ES_PASSWORD ""
@@ -172,9 +176,9 @@ emit RMQ_SECRET_KEY ""
 emit PULSAR_SERVICE_URL ""
 emit PULSAR_JWT_TOKEN ""
 
-# Vector store / knowledge. External config should override these.
-emit VECTOR_STORE_TYPE ""
-emit MILVUS_ADDR ""
+# Vector store / knowledge. Local Milvus is the default all-in-one path.
+emit VECTOR_STORE_TYPE "milvus"
+emit MILVUS_ADDR "127.0.0.1:19530"
 emit MILVUS_USER ""
 emit MILVUS_PASSWORD ""
 emit MILVUS_TOKEN ""
@@ -268,4 +272,7 @@ emit PLUGIN_AES_STATE_SECRET ""
 emit PLUGIN_AES_OAUTH_TOKEN_SECRET ""
 
 chmod 600 "$ENV_FILE"
+if id user >/dev/null 2>&1; then
+  chown user:user "$ENV_FILE" "$GENERATED_ENV_FILE" || true
+fi
 echo "[render-env] wrote $ENV_FILE with SERVER_HOST=$PUBLIC_URL"
