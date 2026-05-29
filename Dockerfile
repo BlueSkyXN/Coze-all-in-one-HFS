@@ -119,6 +119,7 @@ RUN set -eux; \
     curl -fsSL "https://raw.githubusercontent.com/coze-dev/coze-studio/${COZE_GIT_REF}/docker/volumes/elasticsearch/analysis-smartcn.zip" -o /opt/coze-hfs/elasticsearch/analysis-smartcn.zip; \
     curl -fsSL "https://raw.githubusercontent.com/coze-dev/coze-studio/${COZE_GIT_REF}/docker/volumes/elasticsearch/es_index_schema/coze_resource.index-template.json" -o /opt/coze-hfs/elasticsearch/es_index_schema/coze_resource.index-template.json; \
     curl -fsSL "https://raw.githubusercontent.com/coze-dev/coze-studio/${COZE_GIT_REF}/docker/volumes/elasticsearch/es_index_schema/project_draft.index-template.json" -o /opt/coze-hfs/elasticsearch/es_index_schema/project_draft.index-template.json; \
+    sed -i 's/utf8mb4_0900_ai_ci/utf8mb4_unicode_ci/g' /opt/coze/bootstrap/schema.sql /opt/coze/bootstrap/opencoze_latest_schema.hcl; \
     cp /opt/coze-hfs/elasticsearch/elasticsearch.yml /opt/bitnami/elasticsearch/config/my_elasticsearch.yml; \
     chown -R user:user /app /opt/coze /opt/coze-web /opt/coze-hfs
 
