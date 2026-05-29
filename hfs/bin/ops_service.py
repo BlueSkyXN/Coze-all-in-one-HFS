@@ -54,7 +54,14 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self) -> None:
-        if self.path.split("?", 1)[0] not in {"/healthz", "/readyz", "/status"}:
+        if self.path.split("?", 1)[0] not in {
+            "/healthz",
+            "/readyz",
+            "/status",
+            "/_ops/healthz",
+            "/_ops/readyz",
+            "/_ops/status",
+        }:
             self.send_json(404, {"status": "not_found"})
             return
         code, payload = health_payload()
