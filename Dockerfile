@@ -127,6 +127,8 @@ COPY hfs/conf/ /opt/coze-hfs/conf/
 
 RUN chmod +x /opt/coze-hfs/bin/*.sh \
     && elasticsearch-plugin install --batch file:///opt/coze-hfs/elasticsearch/analysis-smartcn.zip \
+    && test -x /usr/bin/tini \
+    && test -x /usr/bin/python3 \
     && chown -R user:user /opt/coze-hfs /app /opt/coze /opt/coze-web /data/coze
 
 WORKDIR /app
