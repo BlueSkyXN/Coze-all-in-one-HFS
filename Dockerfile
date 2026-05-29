@@ -40,6 +40,8 @@ RUN install_packages \
       file \
       jq \
       libaio1 \
+      libgomp1 \
+      libopenblas0 \
       mariadb-client \
       mariadb-server \
       nats-server \
