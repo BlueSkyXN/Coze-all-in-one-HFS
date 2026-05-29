@@ -58,6 +58,8 @@ RUN install_packages \
       xz-utils \
     && update-ca-certificates
 
+RUN ln -sf /lib/ld-musl-x86_64.so.1 /lib/libc.musl-x86_64.so.1
+
 COPY --from=etcd /opt/bitnami/etcd /opt/bitnami/etcd
 COPY --from=milvus /milvus /milvus
 
