@@ -39,6 +39,7 @@ RUN install_packages \
       curl \
       file \
       jq \
+      libaio1 \
       mariadb-client \
       mariadb-server \
       nats-server \
@@ -128,6 +129,9 @@ COPY hfs/conf/ /opt/coze-hfs/conf/
 
 RUN chmod +x /opt/coze-hfs/bin/*.sh \
     && elasticsearch-plugin install --batch file:///opt/coze-hfs/elasticsearch/analysis-smartcn.zip \
+    && ldd /milvus/bin/milvus > /tmp/milvus.ldd \
+    && cat /tmp/milvus.ldd \
+    && ! grep -q "not found" /tmp/milvus.ldd \
     && test -x /usr/bin/tini \
     && test -x /usr/bin/python3 \
     && test -x /usr/sbin/nats-server \

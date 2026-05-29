@@ -53,7 +53,7 @@ curl -fsS https://blueskyxn-coze-all-in-one-hfs.hf.space/_ops/healthz
 - `minio=false`：本地 MinIO fallback 未启动；如果 `ENABLE_LOCAL_MINIO=0`，不应检查该项。
 - `etcd=false`：Milvus 依赖的 etcd 未启动。
 - `elasticsearch=false`：ES 未启动或 `analysis-smartcn` / index template 初始化失败。
-- `milvus=false`：Milvus standalone 未启动，通常要继续看 etcd/MinIO 依赖。
+- `milvus=false`：Milvus standalone 未启动，先看 etcd/MinIO 依赖；如果日志出现 `libaio.so.1`，说明 final image 缺 `libaio1` 这类 Milvus runtime 动态库。
 - `coze_server=false`：Coze Server 未监听 `8888`，继续看 ES、VectorStore、DB 或 model 初始化错误。
 
 ## 登录或注册被拦
