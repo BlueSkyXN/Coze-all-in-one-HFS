@@ -15,7 +15,7 @@ else
 fi
 
 secret_value() {
-  python3 - <<'PY'
+  /usr/bin/python3 - <<'PY'
 import secrets
 print(secrets.token_urlsafe(32))
 PY
