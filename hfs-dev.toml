@@ -14,10 +14,14 @@ required_files = [
   "hfs-dev.toml",
   "hfs",
   "hfs/AGENTS.md",
+  "hfs/bin/ops_service.py",
+  "hfs/bin/admin_service.py",
+  "hfs/bin/run-admin-service.sh",
   "docs",
   "docs/hfs-alignment.md",
   "docs/release-checklist.md",
   "scripts",
+  "scripts/admin-smoke.sh",
   "scripts/validate-hfs-contract.sh",
   "AGENTS.md",
 ]
@@ -26,7 +30,7 @@ required_files = [
 name = "COZE_SERVER_TAG"
 type = "image_tag"
 source = "Dockerfile ARG"
-current_dev_default = "0.5.1"
+current_dev_default = "0.5.1@sha256:bacce3aa5960a2f18362eac93317e42a8c0dbd125a44ec47519f12a8a27c7744"
 required_for_release = true
 dev_mutable_default_allowed = false
 release_requires_digest = true
@@ -36,7 +40,7 @@ notes = "Used as cozedev/coze-studio-server:${COZE_SERVER_TAG}; keep aligned wit
 name = "COZE_WEB_TAG"
 type = "image_tag"
 source = "Dockerfile ARG"
-current_dev_default = "0.5.1"
+current_dev_default = "0.5.1@sha256:a137a16ab75b871b08911ca87359fc8981b225b63b94cf3e0979069fbd862aea"
 required_for_release = true
 dev_mutable_default_allowed = false
 release_requires_digest = true

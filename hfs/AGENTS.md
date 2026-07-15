@@ -1,39 +1,51 @@
-# hfs/ Runtime Guardrails
+# hfs/ runtime guardrails
 
-本目录是 Hugging Face Docker Space 的 runtime glue 层。改这里会直接影响容器启动、端口暴露、数据目录、健康检查和线上可诊断性。
+This directory is the Hugging Face Docker Space runtime glue layer. Read this card before modifying entrypoints, service scripts, Nginx, Supervisor, ops health, or runtime tests.
 
-## 适用边界
+Key files: `bin/entrypoint.sh`, `bin/healthcheck.sh`, `bin/ops_service.py`, `conf/nginx.conf`, `conf/supervisord.conf`, `tests/test_ops_service.py`.
 
-- `bin/`：entrypoint、服务启动脚本、healthcheck、ops service。
-- `conf/`：Nginx、Supervisor、Redis、NATS 等运行配置。
-- `tests/`：只覆盖本目录内脚本或 Python runtime helper，不依赖真实外部服务。
+## Scope
 
-## 不变量
+- `bin/`: entrypoint, service startup scripts, healthcheck, env rendering, bootstrap helpers, and the Python ops service.
+- `conf/`: Nginx, Supervisor, Redis, and NATS runtime config.
+- `tests/`: local tests for runtime helpers. These tests must not require real external services.
 
-- 对外只暴露 Nginx `7860`，不要新增第二个 public listener。
-- `/_ops/healthz`、`/_ops/readyz`、`/_ops/status` 必须保持 read-only JSON 诊断面。
-- `/_ops/*` 不允许加入 shell、SQL、restart、delete、secret rotation、配置写入或任意命令执行。
-- `/data/coze` 是持久化根；MySQL、Redis、NATS、MinIO、etcd、Milvus、Elasticsearch 的运行数据不要写回镜像层。
-- Nginx 必须保留 `/nginx-health`、`/_ops/*` proxy、Coze Web 静态入口、Coze Server API proxy 和 `/local_storage/` fallback 的路径边界。
-- `ENABLE_LOCAL_MINIO=0` 只表示不启动本地 MinIO；内置 Milvus 仍需要 `MINIO_ADDRESS` 指向可访问的外部对象存储。
+## Why this is high-risk
 
-## 修改规则
+- Changes here affect container startup, exposed routes, persistent data paths, service supervision, and live health reporting.
+- `/_ops/*` is remotely reachable through Nginx, so accidental write/action behavior is a security issue.
+- Coze, MariaDB, Redis, NATS, MinIO, etcd, Milvus, and Elasticsearch share one container and `/data/coze` persistence assumptions.
 
-- 改 `ops_service.py` 时同步更新 `hfs/tests/test_ops_service.py`，并保持无第三方 Python 依赖。
-- 改端口、路由、health endpoint 或 `Dockerfile` build input 时，同步更新 `hfs-dev.toml`、`scripts/validate-hfs-contract.sh`、`scripts/hf-space-smoke.sh` 和公开 docs。
-- 改启动顺序或服务名时，同步检查 `supervisord.conf`、对应 `run-*.sh`、`healthcheck.sh` 和 README/docs 的服务列表。
-- 不把 `.env.local`、真实 token、私有 endpoint、账号密码或本机路径写入本目录。
+## Required before changes
 
-## 验证
+- Identify every affected runtime surface: entrypoint, Supervisor service, Nginx route, healthcheck, ops JSON, env rendering, or persistent data path.
+- For `ops_service.py`, inspect `tests/test_ops_service.py` and update tests with behavior changes.
+- For port, route, health endpoint, `Dockerfile` build input, or copied-file changes, plan synchronized updates to `hfs-dev.toml`, `scripts/validate-hfs-contract.sh`, `scripts/hf-space-smoke.sh`, and public docs.
+- For startup order or service name changes, check `conf/supervisord.conf`, corresponding `bin/run-*.sh`, `bin/healthcheck.sh`, and README/docs service lists.
 
-```bash
-./scripts/static-check.sh
-./scripts/check-syntax.sh
-python3 -m unittest discover -s hfs/tests -p 'test_*.py'
-```
+## Local invariants
 
-需要验证线上 Space 时再跑：
+- Public traffic goes through Nginx on port `7860`; do not add a second public listener.
+- `/_ops/healthz`, `/_ops/readyz`, and `/_ops/status` remain read-only JSON diagnostics.
+- `/_ops/*` must not expose shell, SQL, restart, delete, secret rotation, config writes, or arbitrary command execution.
+- `/_admin/*` remains default-off, uses a separate token, and runs as the dedicated `cozeadmin` OS user. Do not give the shared Coze runtime `user` access to the Supervisor control socket.
+- Coze `v0.5.1` upstream `/admin` and `/api/admin/*` stay blocked until a matching server/web release contains the fail-closed admin authorization fix.
+- `/data/coze` is the persistent root. Runtime data for MySQL/MariaDB, Redis, NATS, MinIO, etcd, Milvus, and Elasticsearch must not be written back into the image layer.
+- Nginx must retain `/nginx-health`, `/_ops/*` proxying, Coze Web static routing, Coze Server API proxying, and `/local_storage/` fallback boundaries.
+- `ENABLE_LOCAL_MINIO=0` only disables bundled MinIO startup; embedded Milvus still needs `MINIO_ADDRESS` pointing at reachable object storage.
 
-```bash
-./scripts/hf-space-smoke.sh https://blueskyxn-coze-all-in-one-hfs.hf.space
-```
+## Do not
+
+- Do not write `.env.local`, real tokens, private endpoints, account names, passwords, or local machine paths into this directory.
+- Do not add third-party Python dependencies for `ops_service.py`; keep it standard-library only.
+- Do not turn health or ops endpoints into control-plane APIs.
+- Do not change runtime ports or paths without updating the root contract and smoke checks.
+
+## Validation
+
+| Command | Purpose | Sandbox notes |
+|---|---|---|
+| `./scripts/check-syntax.sh` | Shell syntax for `hfs/` and `scripts/`. | No network or Docker. |
+| `python3 -m unittest discover -s hfs/tests -p 'test_*.py'` | Runtime helper tests. | No network or Docker. Use `python3`. |
+| `./scripts/static-check.sh` | Full repository static gate for HFS changes. | No network or Docker. Requires Git metadata and `python3`; optional `shellcheck` may be skipped. |
+| `./scripts/hf-space-smoke.sh https://blueskyxn-coze-all-in-one-hfs.hf.space` | Live Hugging Face smoke check. | Requires network and a running Space. |

@@ -43,12 +43,21 @@ SECRET_KEYS=(
   PLUGIN_AES_OAUTH_TOKEN_SECRET
 )
 
-declare -A USER_OVERRIDES=()
+USER_OVERRIDE_KEYS=()
+USER_OVERRIDE_VALUES=()
 for key in "${SECRET_KEYS[@]}"; do
   if [ -n "${!key-}" ]; then
-    USER_OVERRIDES["$key"]="${!key}"
+    USER_OVERRIDE_KEYS+=("$key")
+    USER_OVERRIDE_VALUES+=("${!key}")
   fi
 done
+
+restore_user_overrides() {
+  local index
+  for index in "${!USER_OVERRIDE_KEYS[@]}"; do
+    export "${USER_OVERRIDE_KEYS[$index]}=${USER_OVERRIDE_VALUES[$index]}"
+  done
+}
 
 mkdir -p "$DATA_DIR"
 touch "$GENERATED_ENV_FILE"
@@ -56,9 +65,7 @@ chmod 600 "$GENERATED_ENV_FILE"
 
 # shellcheck disable=SC1090
 source "$GENERATED_ENV_FILE"
-for key in "${!USER_OVERRIDES[@]}"; do
-  export "$key=${USER_OVERRIDES[$key]}"
-done
+restore_user_overrides
 
 for key in "${SECRET_KEYS[@]}"; do
   ensure_generated_secret "$key"
@@ -66,9 +73,7 @@ done
 
 # shellcheck disable=SC1090
 source "$GENERATED_ENV_FILE"
-for key in "${!USER_OVERRIDES[@]}"; do
-  export "$key=${USER_OVERRIDES[$key]}"
-done
+restore_user_overrides
 
 q() {
   # Shell-quote for .env export lines.
@@ -263,6 +268,19 @@ emit BUILTIN_CM_GEMINI_PROJECT ""
 emit BUILTIN_CM_GEMINI_LOCATION ""
 emit BUILTIN_CM_GEMINI_BASE_URL ""
 emit BUILTIN_CM_GEMINI_MODEL ""
+
+# Coze v0.5.1 treats an unset runner as local execution. Keep public HFS
+# deployments on the upstream sandbox path explicitly.
+emit CODE_RUNNER_TYPE "sandbox"
+emit CODE_RUNNER_ALLOW_ENV ""
+emit CODE_RUNNER_ALLOW_READ ""
+emit CODE_RUNNER_ALLOW_WRITE ""
+emit CODE_RUNNER_ALLOW_RUN ""
+emit CODE_RUNNER_ALLOW_NET "cdn.jsdelivr.net"
+emit CODE_RUNNER_ALLOW_FFI ""
+emit CODE_RUNNER_NODE_MODULES_DIR ""
+emit CODE_RUNNER_TIMEOUT_SECONDS "60"
+emit CODE_RUNNER_MEMORY_LIMIT_MB "100"
 
 # Public-network safety.
 emit DISABLE_USER_REGISTRATION "true"

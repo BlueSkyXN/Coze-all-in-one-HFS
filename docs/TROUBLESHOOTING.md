@@ -56,6 +56,57 @@ curl -fsS https://blueskyxn-coze-all-in-one-hfs.hf.space/_ops/healthz
 - `milvus=false`：Milvus standalone 未启动，先看 etcd/MinIO 依赖；如果日志出现 `libaio.so.1`、`libgomp.so.1` 或 `libopenblas.so.0`，说明 final image 缺 Milvus runtime 动态库。
 - `coze_server=false`：Coze Server 未监听 `8888`，继续看 ES、VectorStore、DB 或 model 初始化错误；如果日志出现 `/app/opencoze: cannot execute: required file not found`，说明 Alpine/musl ABI 的 Coze server 二进制缺动态加载器。
 
+如果已配置 `OPS_TOKEN`，继续查看只读诊断面：
+
+```bash
+curl -H "X-Ops-Token: $OPS_TOKEN" \
+  https://blueskyxn-coze-all-in-one-hfs.hf.space/_ops/processes
+curl -H "X-Ops-Token: $OPS_TOKEN" \
+  "https://blueskyxn-coze-all-in-one-hfs.hf.space/_ops/logs?service=coze-server&lines=200"
+curl -H "X-Ops-Token: $OPS_TOKEN" \
+  https://blueskyxn-coze-all-in-one-hfs.hf.space/_ops/errors
+```
+
+`/_ops/logs` 只能读取 `/data/coze/logs` 下的白名单日志；不能用它读取任意路径、secret 文件或 `.env.local`。
+
+## `/_ops/` 返回 401 或 503
+
+- 401：未提供有效 `OPS_TOKEN`。CLI 使用 `X-Ops-Token` 或 `Authorization: Bearer`。
+- 503：`OPS_TOKEN` 未设置或少于 24 字符。
+
+浏览器直接打开：
+
+```text
+/_ops/
+```
+
+在页面中输入 `OPS_TOKEN`。服务明确拒绝 `?token=`；不要把 secret 放进 URL、浏览器历史或 Nginx access log。刷新页面后需要重新输入，这是有意的非持久化认证边界。
+
+## `/_admin/` 返回 404
+
+这是默认安全状态：`ADMIN_ENABLED=false`。确需短期开启时设置：
+
+```text
+ADMIN_ENABLED=true
+ADMIN_TOKEN=<at-least-24-random-characters>
+```
+
+`ADMIN_TOKEN` 不能复用 `OPS_TOKEN`。admin service 使用独立 `cozeadmin` OS user，默认 audit 路径是 `/data/coze/admin/audit.jsonl`。
+
+开启后用 smoke 验证：
+
+```bash
+ADMIN_EXPECTED_ENABLED=true \
+ADMIN_TOKEN=$ADMIN_TOKEN \
+./scripts/admin-smoke.sh https://blueskyxn-coze-all-in-one-hfs.hf.space
+```
+
+公开 Space 不建议长期开启 admin。`/_admin` 只支持白名单 action、`confirm=true`、cookie CSRF 和 audit，不提供 Web terminal、任意 shell command、SQL 执行或 secret rotation。
+
+## `/admin` 或 `/api/admin/*` 返回 404
+
+这是 Coze `v0.5.1` 的临时安全 guard，不是 Nginx 路由遗漏。该版本的 upstream admin middleware 在 admin email 为空时会 fail-open；wrapper 在匹配的 upstream 修复版 server/web 镜像发布前阻断内置 admin UI/API。运行策略通过 HF Variables/Secrets 和 `/app/.env` 管理，不要绕过该 guard。
+
 ## 登录或注册被拦
 
 公开 Space 默认关闭注册：
@@ -64,13 +115,24 @@ curl -fsS https://blueskyxn-coze-all-in-one-hfs.hf.space/_ops/healthz
 DISABLE_USER_REGISTRATION=true
 ```
 
-受控测试可以设置：
+`ALLOW_REGISTRATION_EMAIL` 在 Coze `v0.5.1` fresh fallback config 中存在 upstream 读取缺陷，不能只凭 env 值声称 allowlist 已生效。受控测试可以设置：
 
 ```bash
 ALLOW_REGISTRATION_EMAIL=you@example.com
 ```
 
-不要在公开文档、PR 文案或截图里写真实邮箱、账号或密码。
+设置后仍需执行真实注册 smoke；不要在公开文档、PR 文案或截图里写真实邮箱、账号或密码。
+
+## Code runner 不在 sandbox
+
+生成的 `/app/.env` 应包含：
+
+```text
+CODE_RUNNER_TYPE=sandbox
+CODE_RUNNER_ALLOW_NET=cdn.jsdelivr.net
+```
+
+Coze `v0.5.1` 对空值会回退到 local runner。本 wrapper 已显式覆盖为 sandbox；如果手动设置 `CODE_RUNNER_TYPE=local`，属于明确降低隔离级别的操作。静态 env 检查不能替代真实 workflow code-node smoke，尤其要确认 `user` 的 `HOME=/home/user` 下 Deno/Pyodide 首次加载成功。
 
 ## 模型不可用
 

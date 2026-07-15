@@ -15,4 +15,5 @@
 ```bash
 ./scripts/static-check.sh
 ./scripts/hf-space-smoke.sh https://blueskyxn-coze-all-in-one-hfs.hf.space
+./scripts/admin-smoke.sh https://blueskyxn-coze-all-in-one-hfs.hf.space
 ```
