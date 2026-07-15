@@ -8,8 +8,9 @@
 | --- | --- |
 | GitHub Variables | 未配置 |
 | GitHub Secrets | 未配置 |
-| Hugging Face Variables | `COZE_PUBLIC_URL`、`DISABLE_USER_REGISTRATION`、`ENABLE_LOCAL_MINIO`、`LOG_LEVEL` |
+| Hugging Face Variables | `ADMIN_ENABLED`、`CODE_RUNNER_TYPE`、`COZE_PUBLIC_URL`、`DISABLE_USER_REGISTRATION`、`ENABLE_LOCAL_MINIO`、`LOG_LEVEL` |
 | Hugging Face Secrets | 当前 key list 为空；模型、Ops、存储、检索等 secrets 尚未配置 |
+| Hugging Face Space | `private=true`；未配置 persistent volume |
 
 ## 推荐 HF Variables
 
