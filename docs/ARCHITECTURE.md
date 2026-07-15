@@ -108,7 +108,7 @@ Coze v0.5.1 的 bootstrap 文件包含 MySQL 8.0 专属 collation `utf8mb4_0900_
 
 ## Ops / Admin Surface
 
-`/_ops/healthz`、`/_ops/readyz`、`/_ops/status` 只做公开只读健康检查。返回字段包括 `mariadb`、`redis`、`nats`、`minio`、`etcd`、`elasticsearch`、`milvus`、`coze_server`、`data_dir`。
+`/_ops/healthz`、`/_ops/readyz`、`/_ops/status` 只做公开只读健康检查。返回字段包括 `mariadb`、`redis`、`nats`、`minio`、`etcd`、`elasticsearch`、`milvus`、`coze_server`、`data_dir` 和非敏感运行策略 `code_runner_type`；live smoke 要求其为 `sandbox`。
 
 完整 `/_ops/` dashboard/API 仍是只读面，但需要 `OPS_TOKEN`。它覆盖：
 

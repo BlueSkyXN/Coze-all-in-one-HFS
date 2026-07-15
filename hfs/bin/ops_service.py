@@ -198,6 +198,7 @@ def health_payload() -> tuple[int, dict[str, Any]]:
         "checks": checks,
         "data_dir": str(DATA_DIR),
         "public_url": env("COZE_PUBLIC_URL") or env("SPACE_HOST"),
+        "code_runner_type": env("CODE_RUNNER_TYPE"),
     }
 
 
