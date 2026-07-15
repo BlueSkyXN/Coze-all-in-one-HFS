@@ -343,6 +343,8 @@ require_grep 'x-frame-options' scripts/hf-space-smoke.sh \
   "smoke must reject X-Frame-Options on web entry"
 require_grep 'status.*ok|ops status is not ok' scripts/hf-space-smoke.sh \
   "smoke must assert ops JSON status"
+require_grep 'code runner is not sandbox' scripts/hf-space-smoke.sh \
+  "smoke must assert the live sandbox policy"
 require_grep 'ops-query-token-rejected' scripts/hf-space-smoke.sh \
   "smoke must reject tokens supplied in URLs"
 require_grep 'upstream-admin-api-blocked' scripts/hf-space-smoke.sh \

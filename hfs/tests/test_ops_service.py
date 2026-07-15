@@ -49,11 +49,13 @@ class OpsServiceTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             ops_service.DATA_DIR = Path(tmpdir)
             os.environ["ENABLE_LOCAL_MINIO"] = "1"
+            os.environ["CODE_RUNNER_TYPE"] = "sandbox"
 
             code, payload = ops_service.health_payload()
 
         self.assertEqual(code, 200)
         self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["code_runner_type"], "sandbox")
         self.assertTrue(payload["checks"]["minio"])
         self.assertTrue(all(payload["checks"].values()))
 

@@ -59,6 +59,8 @@ from pathlib import Path
 payload = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
 if payload.get("status") != "ok":
     raise SystemExit(f"ops status is not ok: {payload.get('status')!r}")
+if payload.get("code_runner_type") != "sandbox":
+    raise SystemExit(f"code runner is not sandbox: {payload.get('code_runner_type')!r}")
 checks = payload.get("checks")
 if not isinstance(checks, dict) or not checks:
     raise SystemExit("ops checks must be a non-empty object")
@@ -66,7 +68,7 @@ failed = sorted(name for name, ok in checks.items() if ok is not True)
 if failed:
     raise SystemExit("ops checks failed: " + ", ".join(failed))
 PY
-  printf 'PASS ops-health-json: status ok and all checks true\n'
+  printf 'PASS ops-health-json: status ok, code runner sandbox, and all checks true\n'
 }
 
 check_ops() {
