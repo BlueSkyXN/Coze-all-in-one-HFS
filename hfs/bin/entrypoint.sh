@@ -6,6 +6,7 @@ export DATA_DIR="${DATA_DIR:-/data/coze}"
 echo "[entrypoint] starting Coze HFS runtime with DATA_DIR=$DATA_DIR"
 echo "[entrypoint] ensuring runtime directories"
 mkdir -p \
+  "$DATA_DIR/admin" \
   "$DATA_DIR/mysql" \
   "$DATA_DIR/redis" \
   "$DATA_DIR/nats" \
@@ -39,6 +40,8 @@ chown user:user \
   "$DATA_DIR/nginx/uwsgi_temp" \
   "$DATA_DIR/nginx/scgi_temp" \
   /run/nginx /var/lib/nginx /var/log/nginx || true
+chown -R user:user "$DATA_DIR/logs" "$DATA_DIR/run" "$DATA_DIR/nginx" || true
+chown -R cozeadmin:cozeadmin "$DATA_DIR/admin"
 
 echo "[entrypoint] bootstrapping MariaDB"
 /opt/coze-hfs/bin/mysql-init.sh

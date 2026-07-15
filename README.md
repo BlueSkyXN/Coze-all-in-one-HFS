@@ -18,8 +18,8 @@ license: gpl-3.0
 
 镜像构建采用 Coze Studio 官方镜像组装模式：
 
-- `cozedev/coze-studio-server:0.5.1`
-- `cozedev/coze-studio-web:0.5.1`
+- `cozedev/coze-studio-server:0.5.1@sha256:bacce3aa5960a2f18362eac93317e42a8c0dbd125a44ec47519f12a8a27c7744`
+- `cozedev/coze-studio-web:0.5.1@sha256:a137a16ab75b871b08911ca87359fc8981b225b63b94cf3e0979069fbd862aea`
 - `coze-dev/coze-studio` 的 `v0.5.1` MySQL schema / Atlas schema
 - Elasticsearch 运行层，内置 Nginx、Supervisor、MariaDB、Redis、NATS JetStream、MinIO fallback、etcd、Milvus、Elasticsearch
 
@@ -31,8 +31,11 @@ browser
   -> nginx:7860
        /                 -> Coze Web 静态文件
        /api, /v1, /v2    -> Coze Server:8888
+       /admin,/api/admin  -> 404 until upstream admin auth is fail-closed
        /local_storage    -> optional MinIO fallback:9000
        /_ops/healthz     -> read-only HFS ops health
+       /_ops/            -> token-protected read-only ops dashboard/API
+       /_admin/          -> default-off admin dashboard/API
 ```
 
 ## 运行边界
@@ -67,6 +70,8 @@ browser
 /_ops/healthz     HFS runtime health, read-only JSON
 /_ops/readyz      同 healthz
 /_ops/status      同 healthz
+/_ops/            只读运维 dashboard，需 OPS_TOKEN
+/_admin/          受控管理入口，默认 ADMIN_ENABLED=false
 /sign             Coze Web 登录入口
 ```
 
@@ -75,9 +80,38 @@ browser
 ```bash
 ./scripts/static-check.sh
 ./scripts/hf-space-smoke.sh https://blueskyxn-coze-all-in-one-hfs.hf.space
+./scripts/admin-smoke.sh https://blueskyxn-coze-all-in-one-hfs.hf.space
 ```
 
 如果本机没有 Docker，不要把本地 build/run 作为验证结论；以 HF build logs、HF runtime logs 和 live endpoint 回读为准。
+
+## Ops 与 Admin
+
+`/_ops/healthz`、`/_ops/readyz`、`/_ops/status` 保持公开只读健康探针，用于 Docker healthcheck、HF smoke 和外部 uptime 判断。
+
+更完整的 `/_ops/` dashboard/API 需要至少 24 字符的强随机 `OPS_TOKEN`。CLI 和自动化优先使用 header：
+
+```bash
+curl -H "X-Ops-Token: $OPS_TOKEN" \
+  https://blueskyxn-coze-all-in-one-hfs.hf.space/_ops/health
+curl -H "X-Ops-Token: $OPS_TOKEN" \
+  https://blueskyxn-coze-all-in-one-hfs.hf.space/_ops/system
+curl -H "X-Ops-Token: $OPS_TOKEN" \
+  "https://blueskyxn-coze-all-in-one-hfs.hf.space/_ops/logs?service=coze-server&lines=100"
+```
+
+浏览器直接打开 `/_ops/`，在页面中输入 `OPS_TOKEN`；token 只保留在当前页面内存中。服务会拒绝 `?token=`，不要把 secret 放入 URL、浏览器历史或 Nginx access log。
+
+`/_admin/` 是独立管理面，默认关闭：
+
+```text
+ADMIN_ENABLED=false
+ADMIN_TOKEN=
+```
+
+确需短期开启时，应使用 Private/Protected Space、至少 24 字符且不复用 `OPS_TOKEN` 的 `ADMIN_TOKEN`，并用 `X-Admin-Token` 或登录 cookie 访问。admin service 使用独立 `cozeadmin` OS user，Supervisor control socket 不向 Coze Server 运行用户开放。当前白名单 action 只有 restart supervisor service 和 run health checks；每个 action 都要求 `confirm=true`，cookie session 还要求 `X-Admin-CSRF`，并写入 `ADMIN_AUDIT_LOG`。`/_ops` 仍只读，不承载写操作、shell、SQL 或任意命令执行。
+
+官方 `v0.5.1` 的内置 `/admin`、`/api/admin/*` 在未保存 admin email 时会 fail-open；本 wrapper 暂时返回 404。待上游发布包含 `5aaf6d5` 或等价修复的匹配 server/web 镜像后再复核是否解除。
 
 ## ENV 管理
 
@@ -89,6 +123,8 @@ browser
 DISABLE_USER_REGISTRATION=true
 ENABLE_LOCAL_MINIO=1
 COZE_PUBLIC_URL=https://blueskyxn-coze-all-in-one-hfs.hf.space
+CODE_RUNNER_TYPE=sandbox
+OPS_TOKEN=<fixed-random-token>
 ```
 
 文本 Agent 测试通常还需要模型配置。含 token/key/password 的值必须放 HF Secrets：

@@ -48,11 +48,14 @@ required=(
   hfs/bin/entrypoint.sh
   hfs/bin/render-env.sh
   hfs/bin/ops_service.py
+  hfs/bin/admin_service.py
+  hfs/bin/run-admin-service.sh
   hfs/conf/nginx.conf
   hfs/conf/supervisord.conf
   docs/env-reference.md
   docs/hfs-alignment.md
   docs/release-checklist.md
+  scripts/admin-smoke.sh
   scripts/validate-hfs-contract.sh
 )
 
@@ -67,6 +70,7 @@ grep -q '^sdk: docker$' README.md
 grep -q '^app_port: 7860$' README.md
 grep -q '^EXPOSE 7860$' Dockerfile
 grep -q 'canonical_health_endpoint = "/_ops/healthz"' hfs-dev.toml
+grep -q '/_admin/' hfs/conf/nginx.conf
 
 scripts/validate-hfs-contract.sh
 
@@ -75,7 +79,7 @@ find hfs scripts -type f -name '*.sh' -print0 | while IFS= read -r -d '' f; do
   bash -n "$f"
 done
 
-python3 -m py_compile hfs/bin/ops_service.py
+python3 -m py_compile hfs/bin/ops_service.py hfs/bin/admin_service.py
 python3 -m unittest discover -s hfs/tests -p 'test_*.py'
 if command -v shellcheck >/dev/null 2>&1; then
   shellcheck hfs/bin/*.sh scripts/*.sh

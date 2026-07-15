@@ -59,8 +59,11 @@ required_files=(
   hfs/bin/entrypoint.sh
   hfs/bin/healthcheck.sh
   hfs/bin/ops_service.py
+  hfs/bin/admin_service.py
+  hfs/bin/run-admin-service.sh
   hfs/conf/nginx.conf
   hfs/conf/supervisord.conf
+  scripts/admin-smoke.sh
   scripts/hf-space-smoke.sh
   scripts/static-check.sh
   docs/hfs-alignment.md
@@ -266,6 +269,10 @@ require_grep '^ARG COZE_SERVER_TAG=' Dockerfile \
   "Dockerfile must expose COZE_SERVER_TAG build input"
 require_grep '^ARG COZE_WEB_TAG=' Dockerfile \
   "Dockerfile must expose COZE_WEB_TAG build input"
+require_grep '^ARG COZE_SERVER_TAG=[^ ]+@sha256:[0-9a-f]{64}$' Dockerfile \
+  "Dockerfile default Coze server image must be digest-pinned"
+require_grep '^ARG COZE_WEB_TAG=[^ ]+@sha256:[0-9a-f]{64}$' Dockerfile \
+  "Dockerfile default Coze web image must be digest-pinned"
 require_grep '^ARG COZE_GIT_REF=' Dockerfile \
   "Dockerfile must expose COZE_GIT_REF build input"
 require_grep '^ARG ELASTICSEARCH_IMAGE=' Dockerfile \
@@ -328,18 +335,52 @@ require_grep '/nginx-health' scripts/hf-space-smoke.sh \
   "smoke must check /nginx-health"
 require_grep '/_ops/healthz' scripts/hf-space-smoke.sh \
   "smoke must check /_ops/healthz"
+require_grep '/_admin/' scripts/hf-space-smoke.sh \
+  "smoke must check default /_admin behavior"
 require_grep '/sign' scripts/hf-space-smoke.sh \
   "smoke must check /sign"
 require_grep 'x-frame-options' scripts/hf-space-smoke.sh \
   "smoke must reject X-Frame-Options on web entry"
 require_grep 'status.*ok|ops status is not ok' scripts/hf-space-smoke.sh \
   "smoke must assert ops JSON status"
+require_grep 'ops-query-token-rejected' scripts/hf-space-smoke.sh \
+  "smoke must reject tokens supplied in URLs"
+require_grep 'upstream-admin-api-blocked' scripts/hf-space-smoke.sh \
+  "smoke must verify the Coze v0.5.1 admin API guard"
 
-require_grep 'location ~ \^/_ops/\(healthz\|readyz\|status\)\$' hfs/conf/nginx.conf \
-  "nginx must expose only read-only /_ops health endpoints"
-require_grep 'proxy_pass http://127\.0\.0\.1:8081' hfs/conf/nginx.conf \
-  "nginx must proxy /_ops health endpoints to ops service"
-require_grep 'Content-Security-Policy "frame-ancestors https://huggingface\.co https://\*\.hf\.space" always' hfs/conf/nginx.conf \
+require_grep 'location /_ops/' hfs/conf/nginx.conf \
+  "nginx must expose /_ops/ control-plane route"
+require_grep 'proxy_pass http://127\.0\.0\.1:8081/' hfs/conf/nginx.conf \
+  "nginx must proxy /_ops/ to ops service"
+require_grep 'location /_admin/' hfs/conf/nginx.conf \
+  "nginx must expose /_admin/ control-plane route"
+require_grep 'proxy_pass http://127\.0\.0\.1:8082/' hfs/conf/nginx.conf \
+  "nginx must proxy /_admin/ to admin service"
+require_grep '\[unix_http_server\]' hfs/conf/supervisord.conf \
+  "supervisor must expose local unix control socket"
+require_grep 'chmod=0700' hfs/conf/supervisord.conf \
+  "supervisor control socket must be owner-only"
+require_grep 'chown=cozeadmin:cozeadmin' hfs/conf/supervisord.conf \
+  "supervisor control socket must be isolated from the Coze runtime user"
+require_grep '\[program:admin-service\]' hfs/conf/supervisord.conf \
+  "supervisor must run admin-service"
+require_grep 'user=cozeadmin' hfs/conf/supervisord.conf \
+  "admin service must run as the dedicated cozeadmin user"
+require_grep 'ADMIN_ENABLED.*false|admin_enabled\(\).*false' hfs/bin/admin_service.py \
+  "admin service must be default-off"
+require_grep 'ALLOWED_RESTART_SERVICES' hfs/bin/admin_service.py \
+  "admin service must use a restart whitelist"
+require_grep 'OPS_TOKEN' hfs/bin/ops_service.py \
+  "ops dashboard must be token protected"
+require_grep 'tokens are not accepted in URLs' hfs/bin/ops_service.py \
+  "ops dashboard must reject query-string tokens"
+require_grep 'emit CODE_RUNNER_TYPE "sandbox"' hfs/bin/render-env.sh \
+  "Coze v0.5.1 must explicitly use the sandbox code runner"
+require_grep 'location \^~ /api/admin/' hfs/conf/nginx.conf \
+  "nginx must block the fail-open Coze v0.5.1 admin API"
+require_grep 'admin-disabled-root' scripts/admin-smoke.sh \
+  "admin smoke must verify default disabled behavior"
+require_grep 'Content-Security-Policy ".*frame-ancestors https://huggingface\.co https://\*\.hf\.space" always' hfs/conf/nginx.conf \
   "nginx must emit frame-ancestors CSP for Hugging Face iframe embedding"
 
 require_ignore_pattern ".env.local"

@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 
-ARG COZE_SERVER_TAG=0.5.1
-ARG COZE_WEB_TAG=0.5.1
+ARG COZE_SERVER_TAG=0.5.1@sha256:bacce3aa5960a2f18362eac93317e42a8c0dbd125a44ec47519f12a8a27c7744
+ARG COZE_WEB_TAG=0.5.1@sha256:a137a16ab75b871b08911ca87359fc8981b225b63b94cf3e0979069fbd862aea
 ARG COZE_GIT_REF=v0.5.1
 ARG ELASTICSEARCH_IMAGE=bitnamilegacy/elasticsearch:8.18.0
 ARG ETCD_IMAGE=bitnamilegacy/etcd:3.5
@@ -14,7 +14,9 @@ FROM ${MILVUS_IMAGE} AS milvus
 
 FROM ${ELASTICSEARCH_IMAGE}
 
-ARG COZE_GIT_REF=v0.5.1
+ARG COZE_SERVER_TAG
+ARG COZE_WEB_TAG
+ARG COZE_GIT_REF
 ARG TARGETARCH
 ARG DENO_VERSION=2.4.5
 ARG DENO_SHA256_AMD64=
@@ -39,6 +41,10 @@ ENV HOME=/home/user \
     DATA_DIR=/data/coze \
     COZE_APP_DIR=/app \
     COZE_WEB_DIR=/opt/coze-web \
+    COZE_SERVER_TAG=${COZE_SERVER_TAG} \
+    COZE_WEB_TAG=${COZE_WEB_TAG} \
+    COZE_GIT_REF=${COZE_GIT_REF} \
+    CODE_RUNNER_TYPE=sandbox \
     SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
 
 USER root
@@ -142,10 +148,13 @@ RUN set -eux; \
 RUN set -eux; \
     getent group user >/dev/null || groupadd -g 1000 user || groupadd user; \
     id -u user >/dev/null 2>&1 || useradd -m -u 1000 -g user -s /bin/bash user || useradd -m -g user -s /bin/bash user; \
+    getent group cozeadmin >/dev/null || groupadd --system cozeadmin; \
+    id -u cozeadmin >/dev/null 2>&1 || useradd --system --gid cozeadmin --home-dir /nonexistent --shell /bin/false cozeadmin; \
     mkdir -p \
       /bitnami/elasticsearch/data \
       /bitnami/etcd \
       /data/coze \
+      /data/coze/admin \
       /data/coze/elasticsearch \
       /data/coze/etcd \
       /data/coze/milvus \
@@ -158,7 +167,8 @@ RUN set -eux; \
       /var/lib/milvus \
       /var/lib/nginx/tmp \
       /var/log/nginx; \
-    chown -R user:user /data /opt/coze-hfs /opt/coze /opt/coze-web /run/nginx /var/lib/nginx /var/log/nginx /home/user
+    chown -R user:user /data /opt/coze-hfs /opt/coze /opt/coze-web /run/nginx /var/lib/nginx /var/log/nginx /home/user; \
+    chown -R cozeadmin:cozeadmin /data/coze/admin
 
 COPY --from=coze-server /app /app
 COPY --from=coze-web /usr/share/nginx/html/ /opt/coze-web/
@@ -190,7 +200,8 @@ RUN chmod +x /opt/coze-hfs/bin/*.sh \
     && test -x /usr/bin/tini \
     && test -x /usr/bin/python3 \
     && test -x /usr/sbin/nats-server \
-    && chown -R user:user /opt/coze-hfs /app /opt/coze /opt/coze-web /data/coze
+    && chown -R user:user /opt/coze-hfs /app /opt/coze /opt/coze-web /data/coze \
+    && chown -R cozeadmin:cozeadmin /data/coze/admin
 
 WORKDIR /app
 

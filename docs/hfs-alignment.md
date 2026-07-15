@@ -24,19 +24,22 @@
 
 ## Runtime Shape
 
-容器内由 Supervisor 管理 MariaDB、Redis、NATS、MinIO fallback、etcd、Elasticsearch、Milvus、Coze Server、ops service 和 Nginx。外部只通过 Nginx `7860` 进入：
+容器内由 Supervisor 管理 MariaDB、Redis、NATS、MinIO fallback、etcd、Elasticsearch、Milvus、Coze Server、ops service、admin service 和 Nginx。外部只通过 Nginx `7860` 进入：
 
 ```text
 /nginx-health          shallow Nginx health
 /_ops/healthz          read-only HFS runtime health JSON
 /_ops/readyz           same health payload
 /_ops/status           same health payload
+/_ops/                 token-protected read-only ops dashboard/API
+/_admin/               default-off admin dashboard/API
 /sign                  Coze Web login entry
-/api, /v1, /v2, /admin Coze Server proxy
+/api, /v1, /v2         Coze Server proxy
+/admin, /api/admin/*    blocked until upstream admin auth is fail-closed
 /local_storage/        optional MinIO fallback proxy
 ```
 
-`/_ops/*` 只保留 read-only diagnostics。不要在 `/_ops` 下加入 shell、SQL、restart、delete、secret rotation、配置写入或任意命令执行能力；如果未来需要管理面，应另设明确隔离的管理入口并先确认风险。
+`/_ops/*` 只保留 read-only diagnostics。`/_admin/*` 是独立管理入口，默认关闭，使用独立 `ADMIN_TOKEN`、白名单 action、`confirm=true`、cookie CSRF 和 audit log。不要在 `/_ops` 下加入 shell、SQL、restart、delete、secret rotation、配置写入或任意命令执行能力；不要在 `/_admin` 下加入任意 shell command 或不受白名单约束的写能力。
 
 ## Release Pins
 
@@ -47,7 +50,17 @@
 - Runtime dependency images：`ELASTICSEARCH_IMAGE`、`ETCD_IMAGE`、`MILVUS_IMAGE`
 - Downloaded artifacts：Deno、Atlas installer、MinIO server、MinIO client
 
-当前开发默认值保持可读 tag/version。对外 release 前，应确认 Coze server/web/tag/git ref 三者一致，并优先把 Coze 镜像 tag 写成 `tag@sha256:...`，把依赖镜像和下载型 artifact 收敛到 digest/checksum 可验证的形式。Dockerfile 不直接执行 `curl | sh`，下载型 artifact 会在 checksum build arg 存在时先校验再安装。
+当前 Coze server/web 默认值已经使用 `v0.5.1` 的 `tag@sha256:...` manifest digest，`COZE_GIT_REF=v0.5.1` 与其保持同一 release。依赖镜像和下载型 artifact 仍需继续收敛到 digest/checksum 可验证的形式。Dockerfile 不直接执行 `curl | sh`，下载型 artifact 会在 checksum build arg 存在时先校验再安装。
+
+## Upstream Tracking Snapshot
+
+2026-07-15 live readback：
+
+- 最新正式 release 仍是 `v0.5.1`；Docker Hub 的 `latest` 与 `0.5.1` 对 server/web 分别指向相同 manifest digest。
+- upstream `main@22275b1c2661d35344a7493cffe401e8cc61cf8e` 比 `v0.5.1` 多 8 个未发布 commit，但没有对应的新 server/web image pair，不能把 `COZE_GIT_REF` 单独切到 `main` 后声称完成适配。
+- wrapper 已等价吸收可由配置层完成的 `8de249d`：生成环境显式设置 `CODE_RUNNER_TYPE=sandbox`。
+- wrapper 暂时阻断 `/admin` 和 `/api/admin/*`，缓解 `5aaf6d5` 修复前的 upstream admin fail-open。SQL injection、OAuth nonce/phishing 和 workflow resume 修复属于 upstream binary 变化，必须等待匹配 release 或改用经过审计的自建 server/web 镜像。
+- 未来 release bump 前必须再次检查 Atlas/schema 变化；当前 bootstrap marker 只覆盖首次初始化，不能把换 binary 等同于完成持久化数据库 migration。
 
 ## Local-Only Materials
 
@@ -61,6 +74,8 @@
 ./scripts/static-check.sh
 ./scripts/check-syntax.sh
 ```
+
+如果本地 runtime 已启动，可额外跑 `./scripts/admin-smoke.sh http://localhost:7860` 验证 admin 默认关闭或受控开启状态。
 
 线上 Space 验证：
 
