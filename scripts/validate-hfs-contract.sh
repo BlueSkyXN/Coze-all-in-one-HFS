@@ -277,16 +277,22 @@ require_grep '^ARG COZE_GIT_REF=' Dockerfile \
   "Dockerfile must expose COZE_GIT_REF build input"
 require_grep '^ARG ELASTICSEARCH_IMAGE=' Dockerfile \
   "Dockerfile must expose ELASTICSEARCH_IMAGE build input"
+require_grep '^ARG ELASTICSEARCH_IMAGE=[^ ]+@sha256:[0-9a-f]{64}$' Dockerfile \
+  "Dockerfile default Elasticsearch image must be digest-pinned"
 require_grep '^ARG ETCD_IMAGE=' Dockerfile \
   "Dockerfile must expose ETCD_IMAGE build input"
+require_grep '^ARG ETCD_IMAGE=[^ ]+@sha256:[0-9a-f]{64}$' Dockerfile \
+  "Dockerfile default etcd image must be digest-pinned"
 require_grep '^ARG MILVUS_IMAGE=' Dockerfile \
   "Dockerfile must expose MILVUS_IMAGE build input"
+require_grep '^ARG MILVUS_IMAGE=[^ ]+@sha256:[0-9a-f]{64}$' Dockerfile \
+  "Dockerfile default Milvus image must be digest-pinned"
 require_grep '^ARG DENO_VERSION=' Dockerfile \
   "Dockerfile must expose DENO_VERSION build input"
-require_grep '^ARG DENO_SHA256_AMD64=' Dockerfile \
-  "Dockerfile must expose DENO_SHA256_AMD64 checksum input"
-require_grep '^ARG DENO_SHA256_ARM64=' Dockerfile \
-  "Dockerfile must expose DENO_SHA256_ARM64 checksum input"
+require_grep '^ARG DENO_SHA256_AMD64=[0-9a-f]{64}$' Dockerfile \
+  "Dockerfile must pin the Deno amd64 checksum"
+require_grep '^ARG DENO_SHA256_ARM64=[0-9a-f]{64}$' Dockerfile \
+  "Dockerfile must pin the Deno arm64 checksum"
 require_grep '^ARG ATLAS_VERSION=' Dockerfile \
   "Dockerfile must expose ATLAS_VERSION build input"
 require_grep '^ARG ATLAS_SHA256_AMD64=[0-9a-f]{64}$' Dockerfile \
@@ -295,16 +301,16 @@ require_grep '^ARG ATLAS_SHA256_ARM64=[0-9a-f]{64}$' Dockerfile \
   "Dockerfile must pin the Atlas arm64 checksum"
 require_grep '^ARG MINIO_VERSION=' Dockerfile \
   "Dockerfile must expose MINIO_VERSION build input"
-require_grep '^ARG MINIO_SHA256_AMD64=' Dockerfile \
-  "Dockerfile must expose MINIO_SHA256_AMD64 checksum input"
-require_grep '^ARG MINIO_SHA256_ARM64=' Dockerfile \
-  "Dockerfile must expose MINIO_SHA256_ARM64 checksum input"
+require_grep '^ARG MINIO_SHA256_AMD64=[0-9a-f]{64}$' Dockerfile \
+  "Dockerfile must pin the MinIO amd64 checksum"
+require_grep '^ARG MINIO_SHA256_ARM64=[0-9a-f]{64}$' Dockerfile \
+  "Dockerfile must pin the MinIO arm64 checksum"
 require_grep '^ARG MC_VERSION=' Dockerfile \
   "Dockerfile must expose MC_VERSION build input"
-require_grep '^ARG MC_SHA256_AMD64=' Dockerfile \
-  "Dockerfile must expose MC_SHA256_AMD64 checksum input"
-require_grep '^ARG MC_SHA256_ARM64=' Dockerfile \
-  "Dockerfile must expose MC_SHA256_ARM64 checksum input"
+require_grep '^ARG MC_SHA256_AMD64=[0-9a-f]{64}$' Dockerfile \
+  "Dockerfile must pin the MinIO client amd64 checksum"
+require_grep '^ARG MC_SHA256_ARM64=[0-9a-f]{64}$' Dockerfile \
+  "Dockerfile must pin the MinIO client arm64 checksum"
 require_grep '^FROM cozedev/coze-studio-server:\$\{COZE_SERVER_TAG\} AS coze-server$' Dockerfile \
   "Dockerfile must select server image from COZE_SERVER_TAG"
 require_grep '^FROM cozedev/coze-studio-web:\$\{COZE_WEB_TAG\} AS coze-web$' Dockerfile \
