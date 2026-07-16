@@ -1,0 +1,124 @@
+name: Build Pinned Coze Artifacts
+
+on:
+  workflow_dispatch:
+    inputs:
+      upstream_ref:
+        description: Exact coze-dev/coze-studio commit to build
+        required: true
+        default: 22275b1c2661d35344a7493cffe401e8cc61cf8e
+  push:
+    branches:
+      - codex/resolve-discovered-issues
+    paths:
+      - .github/workflows/build-pinned-coze.yml
+
+permissions:
+  contents: read
+
+env:
+  UPSTREAM_REF: ${{ inputs.upstream_ref || '22275b1c2661d35344a7493cffe401e8cc61cf8e' }}
+
+jobs:
+  server:
+    name: Build server runtime artifact
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out pinned Coze source
+        uses: actions/checkout@v4
+        with:
+          repository: coze-dev/coze-studio
+          ref: ${{ env.UPSTREAM_REF }}
+          path: upstream
+          fetch-depth: 1
+
+      - name: Verify source commit
+        working-directory: upstream
+        run: test "$(git rev-parse HEAD)" = "$UPSTREAM_REF"
+
+      - name: Build upstream server image
+        run: docker build --platform linux/amd64 -f upstream/backend/Dockerfile -t coze-pinned-server upstream
+
+      - name: Export server application
+        shell: bash
+        run: |
+          set -euo pipefail
+          short_ref="${UPSTREAM_REF:0:12}"
+          container="$(docker create coze-pinned-server)"
+          trap 'docker rm -f "$container" >/dev/null 2>&1 || true' EXIT
+          mkdir -p artifact/app
+          docker cp "$container:/app/." artifact/app/
+          tar --sort=name --mtime='UTC 1970-01-01' --owner=0 --group=0 --numeric-owner \
+            -C artifact/app -czf "artifact/coze-server-app-${short_ref}.tar.gz" .
+          sha256sum "artifact/coze-server-app-${short_ref}.tar.gz" > artifact/SHA256SUMS-server
+          jq -n \
+            --arg component server \
+            --arg upstream_repo coze-dev/coze-studio \
+            --arg upstream_ref "$UPSTREAM_REF" \
+            --arg dockerfile_sha256 "$(sha256sum upstream/backend/Dockerfile | awk '{print $1}')" \
+            --arg workflow_run "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
+            '{component:$component,upstream_repo:$upstream_repo,upstream_ref:$upstream_ref,dockerfile_sha256:$dockerfile_sha256,workflow_run:$workflow_run}' \
+            > artifact/coze-server-build.json
+
+      - name: Upload server artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coze-server-${{ env.UPSTREAM_REF }}
+          path: artifact/
+          if-no-files-found: error
+          retention-days: 14
+
+  web:
+    name: Build web runtime artifact
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Check out pinned Coze source
+        uses: actions/checkout@v4
+        with:
+          repository: coze-dev/coze-studio
+          ref: ${{ env.UPSTREAM_REF }}
+          path: upstream
+          fetch-depth: 1
+
+      - name: Verify source commit
+        working-directory: upstream
+        run: test "$(git rev-parse HEAD)" = "$UPSTREAM_REF"
+
+      - name: Reclaim runner disk
+        run: |
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc
+          docker system prune -af || true
+
+      - name: Build upstream web image
+        run: docker build --platform linux/amd64 -f upstream/frontend/Dockerfile -t coze-pinned-web upstream
+
+      - name: Export web application
+        shell: bash
+        run: |
+          set -euo pipefail
+          short_ref="${UPSTREAM_REF:0:12}"
+          container="$(docker create coze-pinned-web)"
+          trap 'docker rm -f "$container" >/dev/null 2>&1 || true' EXIT
+          mkdir -p artifact/dist
+          docker cp "$container:/usr/share/nginx/html/." artifact/dist/
+          tar --sort=name --mtime='UTC 1970-01-01' --owner=0 --group=0 --numeric-owner \
+            -C artifact/dist -czf "artifact/coze-web-dist-${short_ref}.tar.gz" .
+          sha256sum "artifact/coze-web-dist-${short_ref}.tar.gz" > artifact/SHA256SUMS-web
+          jq -n \
+            --arg component web \
+            --arg upstream_repo coze-dev/coze-studio \
+            --arg upstream_ref "$UPSTREAM_REF" \
+            --arg dockerfile_sha256 "$(sha256sum upstream/frontend/Dockerfile | awk '{print $1}')" \
+            --arg workflow_run "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
+            '{component:$component,upstream_repo:$upstream_repo,upstream_ref:$upstream_ref,dockerfile_sha256:$dockerfile_sha256,workflow_run:$workflow_run}' \
+            > artifact/coze-web-build.json
+
+      - name: Upload web artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coze-web-${{ env.UPSTREAM_REF }}
+          path: artifact/
+          if-no-files-found: error
+          retention-days: 14
