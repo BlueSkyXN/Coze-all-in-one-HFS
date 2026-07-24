@@ -3,9 +3,9 @@
 ARG COZE_SERVER_TAG=0.5.1@sha256:bacce3aa5960a2f18362eac93317e42a8c0dbd125a44ec47519f12a8a27c7744
 ARG COZE_WEB_TAG=0.5.1@sha256:a137a16ab75b871b08911ca87359fc8981b225b63b94cf3e0979069fbd862aea
 ARG COZE_GIT_REF=v0.5.1
-ARG ELASTICSEARCH_IMAGE=bitnamilegacy/elasticsearch:8.18.0
-ARG ETCD_IMAGE=bitnamilegacy/etcd:3.5
-ARG MILVUS_IMAGE=milvusdb/milvus:v2.5.10
+ARG ELASTICSEARCH_IMAGE=bitnamilegacy/elasticsearch:8.18.0@sha256:4a7d14222c876a87c1ddd38e1128d8e42df80071b09ec54db5c32586c9cf5a38
+ARG ETCD_IMAGE=bitnamilegacy/etcd:3.5@sha256:1b9977cf4cce7546873e0ee50e684c38a38a4e7a27d22086fbd2b8a1b44a69d0
+ARG MILVUS_IMAGE=milvusdb/milvus:v2.5.10@sha256:02e1d60d71ab60f435c60076f4fed2abe59602ecd5e18dcfe229c8c558c4379d
 
 FROM cozedev/coze-studio-server:${COZE_SERVER_TAG} AS coze-server
 FROM cozedev/coze-studio-web:${COZE_WEB_TAG} AS coze-web
@@ -19,15 +19,17 @@ ARG COZE_WEB_TAG
 ARG COZE_GIT_REF
 ARG TARGETARCH
 ARG DENO_VERSION=2.4.5
-ARG DENO_SHA256_AMD64=
-ARG DENO_SHA256_ARM64=
-ARG ATLAS_INSTALL_URL=https://atlasgo.sh
-ARG ATLAS_INSTALL_SHA256=
-ARG INSTALL_ATLAS=true
-ARG MINIO_SHA256_AMD64=
-ARG MINIO_SHA256_ARM64=
-ARG MC_SHA256_AMD64=
-ARG MC_SHA256_ARM64=
+ARG DENO_SHA256_AMD64=6f9d8115bb3df582c0c5674507e906323b680be0f0b15e735d0cd5ec6be44444
+ARG DENO_SHA256_ARM64=4e3e86739fe527c6891dbfa73799a5ec1b11f45898aaebf73bf3247c2e6a53dd
+ARG ATLAS_VERSION=v1.2.0
+ARG ATLAS_SHA256_AMD64=19a1f09eaa5469011d2cfb07cd8bdcaa5bb39fbf7c31bd63a60ba9d9aa7f562d
+ARG ATLAS_SHA256_ARM64=8f7f89dd977a85ffe9be66fe157ce462a03036ef67a229ce8a39c3b1856e53f9
+ARG MINIO_VERSION=RELEASE.2025-09-07T16-13-09Z
+ARG MINIO_SHA256_AMD64=7c5bd8512c6e966455b1d198209358b2d191c77a83ab377c4073281065fb855f
+ARG MINIO_SHA256_ARM64=5c83cd2cf151717ba0243f73e1c7802ff36e272b67144bdd7f1f7d684fd6f03d
+ARG MC_VERSION=RELEASE.2025-08-13T08-35-41Z
+ARG MC_SHA256_AMD64=01f866e9c5f9b87c2b09116fa5d7c06695b106242d829a8bb32990c00312e891
+ARG MC_SHA256_ARM64=14c8c9616cfce4636add161304353244e8de383b2e2752c0e9dad01d4c27c12c
 
 LABEL org.opencontainers.image.title="Coze all-in-one HFS" \
       org.opencontainers.image.description="Hugging Face Docker Space wrapper for Coze Studio" \
@@ -103,7 +105,7 @@ RUN set -eux; \
       chmod +x /usr/local/bin/deno; \
     fi
 
-# Atlas CLI is used by Coze's official MySQL bootstrap flow. Keep it optional but available.
+# Atlas CLI is required for reconciling persisted databases with the pinned Coze schema.
 RUN set -eux; \
     verify_sha256() { \
       expected="$1"; \
@@ -114,13 +116,16 @@ RUN set -eux; \
         echo "[build] checksum not set for $path; development build only"; \
       fi; \
     }; \
-    if [ "$INSTALL_ATLAS" = "true" ]; then \
-      curl -fsSL "$ATLAS_INSTALL_URL" -o /tmp/atlas-install.sh; \
-      verify_sha256 "$ATLAS_INSTALL_SHA256" /tmp/atlas-install.sh; \
-      sh /tmp/atlas-install.sh -y --community || true; \
-      rm -f /tmp/atlas-install.sh; \
-      if [ -x /root/.local/bin/atlas ]; then cp /root/.local/bin/atlas /usr/local/bin/atlas; fi; \
-    fi
+    arch="${TARGETARCH:-amd64}"; \
+    case "$arch" in \
+      amd64) atlas_arch="amd64"; atlas_sha="$ATLAS_SHA256_AMD64" ;; \
+      arm64) atlas_arch="arm64"; atlas_sha="$ATLAS_SHA256_ARM64" ;; \
+      *) echo "Unsupported TARGETARCH=$arch for Atlas download" >&2; exit 1 ;; \
+    esac; \
+    curl -fsSL "https://release.ariga.io/atlas/atlas-community-linux-${atlas_arch}-${ATLAS_VERSION}" -o /usr/local/bin/atlas; \
+    verify_sha256 "$atlas_sha" /usr/local/bin/atlas; \
+    chmod +x /usr/local/bin/atlas; \
+    atlas version
 
 # MinIO fallback is included because Milvus and Coze both expect object storage.
 RUN set -eux; \
@@ -139,8 +144,8 @@ RUN set -eux; \
       arm64) minio_arch="arm64"; minio_sha="$MINIO_SHA256_ARM64"; mc_sha="$MC_SHA256_ARM64" ;; \
       *) echo "Unsupported TARGETARCH=$arch for MinIO download" >&2; exit 1 ;; \
     esac; \
-    curl -fsSL "https://dl.min.io/server/minio/release/linux-${minio_arch}/minio" -o /usr/local/bin/minio; \
-    curl -fsSL "https://dl.min.io/client/mc/release/linux-${minio_arch}/mc" -o /usr/local/bin/mc; \
+    curl -fsSL "https://dl.min.io/server/minio/release/linux-${minio_arch}/archive/minio.${MINIO_VERSION}" -o /usr/local/bin/minio; \
+    curl -fsSL "https://dl.min.io/client/mc/release/linux-${minio_arch}/archive/mc.${MC_VERSION}" -o /usr/local/bin/mc; \
     verify_sha256 "$minio_sha" /usr/local/bin/minio; \
     verify_sha256 "$mc_sha" /usr/local/bin/mc; \
     chmod +x /usr/local/bin/minio /usr/local/bin/mc

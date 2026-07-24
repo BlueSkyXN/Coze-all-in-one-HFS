@@ -8,7 +8,7 @@
 | --- | --- |
 | GitHub Variables | 未配置 |
 | GitHub Secrets | 未配置 |
-| Hugging Face Variables | `ADMIN_ENABLED`、`CODE_RUNNER_TYPE`、`COZE_PUBLIC_URL`、`DISABLE_USER_REGISTRATION`、`ENABLE_LOCAL_MINIO`、`LOG_LEVEL` |
+| Hugging Face Variables | `ADMIN_ENABLED`、`CODE_RUNNER_TYPE`、`COZE_PUBLIC_URL`、`DISABLE_USER_REGISTRATION`、`ENABLE_LOCAL_MINIO`、`LOG_LEVEL`、`PERSISTENCE_REQUIRED` |
 | Hugging Face Secrets | 当前 key list 为空；模型、Ops、存储、检索等 secrets 尚未配置 |
 | Hugging Face Space | `private=true`；未配置 persistent volume |
 
@@ -22,6 +22,7 @@
 | `COZE_PUBLIC_URL` | 从 `SPACE_HOST` 推导 | `https://blueskyxn-coze-all-in-one-hfs.hf.space` | 公开 URL；自定义域名时显式覆盖。 |
 | `LOG_LEVEL` | `info` | `info` | Coze Server 日志级别。 |
 | `CODE_RUNNER_TYPE` | `sandbox` | `sandbox` | `v0.5.1` 空值会回退到 local runner；公开部署必须显式保持 sandbox。 |
+| `PERSISTENCE_REQUIRED` | `false` | 挂载 `/data/coze` volume 后设为 `true` | 为 `true` 时，`/_ops/healthz` 会确认 `/data/coze` 是独立 mount；volume 丢失时返回 503。 |
 | `CODE_RUNNER_ALLOW_NET` | `cdn.jsdelivr.net` | 按业务最小化 | Pyodide sandbox 初次加载所需网络 allowlist。 |
 | `CODE_RUNNER_TIMEOUT_SECONDS` | `60` | 按需调整 | workflow code runner 超时。 |
 | `CODE_RUNNER_MEMORY_LIMIT_MB` | `100` | 按需调整 | workflow code runner 内存限制。 |

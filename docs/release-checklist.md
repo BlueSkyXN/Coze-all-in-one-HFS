@@ -24,10 +24,10 @@ git diff --check
 检查 `hfs-dev.toml` 的 `[[release_pins]]` 与 `Dockerfile` 一致：
 
 - `COZE_SERVER_TAG`、`COZE_WEB_TAG`、`COZE_GIT_REF` 指向同一 Coze Studio release；Coze server/web 默认值必须保持 `tag@sha256:...`。
-- `ELASTICSEARCH_IMAGE`、`ETCD_IMAGE`、`MILVUS_IMAGE` 对外 release 前优先改成 digest-pinned image ref。
-- Deno、Atlas installer、MinIO server、MinIO client 仍是下载型 artifact；正式 release 前应补 `DENO_SHA256_*`、`ATLAS_INSTALL_SHA256`、`MINIO_SHA256_*`、`MC_SHA256_*` 或改为可信 artifact source。
+- `ELASTICSEARCH_IMAGE`、`ETCD_IMAGE`、`MILVUS_IMAGE` 必须保持 `tag@sha256:...` manifest digest。
+- Deno、Atlas CLI、MinIO server、MinIO client 必须保持固定版本，并同时提供 amd64/arm64 checksum：`DENO_SHA256_*`、`ATLAS_SHA256_*`、`MINIO_SHA256_*`、`MC_SHA256_*`。
 
-即使 Coze 镜像已经 digest-pinned，只要依赖镜像、Deno、Atlas 或 MinIO/MC 仍未提供完整 digest/checksum，发布说明就不能描述成全链路 checksum-verified release。
+任何新增下载型 artifact 都必须进入 `[[release_pins]]` 并在安装前校验；不允许用空 checksum 发布。
 
 同时执行 upstream readback：确认最新正式 release、Docker Hub server/web tag digest、`v<current>...main` commit 差异。没有匹配 server/web image pair 时，不允许只把 `COZE_GIT_REF` 切到 upstream `main`。
 
@@ -40,6 +40,8 @@ git diff --check
 - 平台注入项：`SPACE_HOST`、`SPACE_ID` 等不要手动配置。
 
 `ENABLE_LOCAL_MINIO=0` 只适合已经提供外部 object storage 的场景。只要继续使用内置 Milvus，就必须保证 `MINIO_ADDRESS` 指向一个 Milvus 可访问的对象存储 endpoint，并提前准备好 `MINIO_BUCKET_NAME` 对应 bucket。
+
+如果 `/data/coze` 已挂载 read-write HF bucket volume，同时设置 `PERSISTENCE_REQUIRED=true`。此后 canonical health 会把 mount 丢失视为 503，避免在 overlay filesystem 上静默启动并误报持久化正常。线上 smoke 使用 `SMOKE_PERSISTENCE_REQUIRED=true` 回读该门禁。
 
 ## 4. Remote Sync
 
@@ -78,6 +80,6 @@ hf spaces info BlueSkyXN/Coze-all-in-one-HFS
 
 如果提供 `OPS_TOKEN`，`hf-space-smoke.sh` 会额外检查 `/_ops/health`、`/_ops/system`、`/_ops/metrics` 和 `/_ops/errors`；smoke 还会验证 `?token=` 被拒绝，避免 secret 进入 URL/access log。如果目标实例显式开启 admin，设置 `SMOKE_ADMIN_ENABLED=true ADMIN_TOKEN=<admin-token>`，脚本会检查 `/_admin/api/status`、`/_admin/api/actions` 与 `/_admin/api/audit`；默认不会执行 admin action，除非额外设置 `SMOKE_ADMIN_ACTIONS=true`。
 
-Coze `v0.5.1` 部署还应确认 `/admin` 与 `/api/admin/*` 返回 404，并在业务验证中确认 code runner 使用 sandbox。下一次版本升级前，先验证持久化 DB 的 Atlas migration，不要只确认新 binary 已启动。
+Coze `v0.5.1` 部署还应确认 `/admin` 与 `/api/admin/*` 返回 404，并在业务验证中确认 code runner 使用 sandbox。版本升级后必须检查启动日志包含目标 schema SHA-256，并验证旧数据目录执行了 Atlas reconcile；不能只确认新 binary 已启动。
 
 如果 runtime SHA 尚未切到目标 commit，继续查 HF build/runtime logs，不要把 repo push 视为部署完成。

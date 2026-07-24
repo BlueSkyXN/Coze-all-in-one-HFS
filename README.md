@@ -124,6 +124,7 @@ DISABLE_USER_REGISTRATION=true
 ENABLE_LOCAL_MINIO=1
 COZE_PUBLIC_URL=https://blueskyxn-coze-all-in-one-hfs.hf.space
 CODE_RUNNER_TYPE=sandbox
+PERSISTENCE_REQUIRED=true
 OPS_TOKEN=<fixed-random-token>
 ```
 
@@ -145,7 +146,7 @@ BUILTIN_CM_OPENAI_MODEL=your-model-id
 
 ## 持久化
 
-默认数据目录是 `/data/coze`。HF Space 未挂载 persistent storage 时，数据库、Redis、NATS、MinIO 数据都可能在 rebuild、restart 或迁移后丢失。长期演示或真实使用前，应在 Hugging Face Space 设置中挂载 persistent storage，并定期备份 `/data/coze/mysql`。
+默认数据目录是 `/data/coze`。HF Space 未挂载 persistent storage 时，数据库、Redis、NATS、MinIO 数据都可能在 rebuild、restart 或迁移后丢失。长期演示或真实使用应把 private HF bucket 以 read-write volume 挂载到 `/data/coze`，并设置 `PERSISTENCE_REQUIRED=true`；canonical health 会在 mount 丢失时返回 503。仍应定期备份 `/data/coze/mysql`。
 
 ## 已知限制
 

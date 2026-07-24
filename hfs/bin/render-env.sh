@@ -104,6 +104,7 @@ emit USE_SSL "0"
 emit SSL_CERT_FILE ""
 emit SSL_KEY_FILE ""
 emit WEB_LISTEN_ADDR "0.0.0.0:7860"
+emit PERSISTENCE_REQUIRED "false"
 
 # MySQL / MariaDB-compatible local service.
 emit MYSQL_ROOT_PASSWORD ""

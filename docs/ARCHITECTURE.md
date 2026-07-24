@@ -61,7 +61,7 @@ local processes:
 
 Coze server/web 默认镜像已 pin 到 `v0.5.1` 的 manifest digest。依赖镜像和下载 artifact 仍需在生产 release 前继续收敛：Dockerfile 已支持 `DENO_SHA256_*`、`ATLAS_INSTALL_SHA256`、`MINIO_SHA256_*` 和 `MC_SHA256_*` build args；未提供这些 checksum 时不能描述成全链路不可变 release。
 
-Coze v0.5.1 的 bootstrap 文件包含 MySQL 8.0 专属 collation `utf8mb4_0900_ai_ci`。本仓库在 build 阶段把 `schema.sql` 和 Atlas HCL 规范化为 `utf8mb4_unicode_ci`，以保持 MariaDB 运行层可启动。
+Coze v0.5.1 的 bootstrap 文件包含 MySQL 8.0 专属 collation `utf8mb4_0900_ai_ci`。本仓库在 build 阶段把 `schema.sql` 和 Atlas HCL 规范化为 `utf8mb4_unicode_ci`，以保持 MariaDB 运行层可启动。首次初始化导入 `schema.sql` 后执行 Atlas reconcile；已存在的数据目录按 HCL SHA-256 判断是否需要 reconcile。Atlas 失败会使启动失败，schema marker 只在成功后原子更新。
 
 ## Persistence
 

@@ -146,25 +146,25 @@ expected_pins = {
         "dev_mutable_default_allowed": False,
         "release_requires_checksum": True,
     },
-    "ATLAS_INSTALL_URL": {
-        "type": "artifact_url",
+    "ATLAS_VERSION": {
+        "type": "artifact_version",
         "source": "Dockerfile ARG",
         "required_for_release": True,
-        "dev_mutable_default_allowed": True,
+        "dev_mutable_default_allowed": False,
         "release_requires_checksum": True,
     },
-    "MINIO_BINARY_URL": {
-        "type": "artifact_url",
-        "source": "Dockerfile hardcoded URL",
+    "MINIO_VERSION": {
+        "type": "artifact_version",
+        "source": "Dockerfile ARG",
         "required_for_release": True,
-        "dev_mutable_default_allowed": True,
+        "dev_mutable_default_allowed": False,
         "release_requires_checksum": True,
     },
-    "MC_BINARY_URL": {
-        "type": "artifact_url",
-        "source": "Dockerfile hardcoded URL",
+    "MC_VERSION": {
+        "type": "artifact_version",
+        "source": "Dockerfile ARG",
         "required_for_release": True,
-        "dev_mutable_default_allowed": True,
+        "dev_mutable_default_allowed": False,
         "release_requires_checksum": True,
     },
 }
@@ -277,28 +277,40 @@ require_grep '^ARG COZE_GIT_REF=' Dockerfile \
   "Dockerfile must expose COZE_GIT_REF build input"
 require_grep '^ARG ELASTICSEARCH_IMAGE=' Dockerfile \
   "Dockerfile must expose ELASTICSEARCH_IMAGE build input"
+require_grep '^ARG ELASTICSEARCH_IMAGE=[^ ]+@sha256:[0-9a-f]{64}$' Dockerfile \
+  "Dockerfile default Elasticsearch image must be digest-pinned"
 require_grep '^ARG ETCD_IMAGE=' Dockerfile \
   "Dockerfile must expose ETCD_IMAGE build input"
+require_grep '^ARG ETCD_IMAGE=[^ ]+@sha256:[0-9a-f]{64}$' Dockerfile \
+  "Dockerfile default etcd image must be digest-pinned"
 require_grep '^ARG MILVUS_IMAGE=' Dockerfile \
   "Dockerfile must expose MILVUS_IMAGE build input"
+require_grep '^ARG MILVUS_IMAGE=[^ ]+@sha256:[0-9a-f]{64}$' Dockerfile \
+  "Dockerfile default Milvus image must be digest-pinned"
 require_grep '^ARG DENO_VERSION=' Dockerfile \
   "Dockerfile must expose DENO_VERSION build input"
-require_grep '^ARG DENO_SHA256_AMD64=' Dockerfile \
-  "Dockerfile must expose DENO_SHA256_AMD64 checksum input"
-require_grep '^ARG DENO_SHA256_ARM64=' Dockerfile \
-  "Dockerfile must expose DENO_SHA256_ARM64 checksum input"
-require_grep '^ARG ATLAS_INSTALL_URL=' Dockerfile \
-  "Dockerfile must expose ATLAS_INSTALL_URL build input"
-require_grep '^ARG ATLAS_INSTALL_SHA256=' Dockerfile \
-  "Dockerfile must expose ATLAS_INSTALL_SHA256 checksum input"
-require_grep '^ARG MINIO_SHA256_AMD64=' Dockerfile \
-  "Dockerfile must expose MINIO_SHA256_AMD64 checksum input"
-require_grep '^ARG MINIO_SHA256_ARM64=' Dockerfile \
-  "Dockerfile must expose MINIO_SHA256_ARM64 checksum input"
-require_grep '^ARG MC_SHA256_AMD64=' Dockerfile \
-  "Dockerfile must expose MC_SHA256_AMD64 checksum input"
-require_grep '^ARG MC_SHA256_ARM64=' Dockerfile \
-  "Dockerfile must expose MC_SHA256_ARM64 checksum input"
+require_grep '^ARG DENO_SHA256_AMD64=[0-9a-f]{64}$' Dockerfile \
+  "Dockerfile must pin the Deno amd64 checksum"
+require_grep '^ARG DENO_SHA256_ARM64=[0-9a-f]{64}$' Dockerfile \
+  "Dockerfile must pin the Deno arm64 checksum"
+require_grep '^ARG ATLAS_VERSION=' Dockerfile \
+  "Dockerfile must expose ATLAS_VERSION build input"
+require_grep '^ARG ATLAS_SHA256_AMD64=[0-9a-f]{64}$' Dockerfile \
+  "Dockerfile must pin the Atlas amd64 checksum"
+require_grep '^ARG ATLAS_SHA256_ARM64=[0-9a-f]{64}$' Dockerfile \
+  "Dockerfile must pin the Atlas arm64 checksum"
+require_grep '^ARG MINIO_VERSION=' Dockerfile \
+  "Dockerfile must expose MINIO_VERSION build input"
+require_grep '^ARG MINIO_SHA256_AMD64=[0-9a-f]{64}$' Dockerfile \
+  "Dockerfile must pin the MinIO amd64 checksum"
+require_grep '^ARG MINIO_SHA256_ARM64=[0-9a-f]{64}$' Dockerfile \
+  "Dockerfile must pin the MinIO arm64 checksum"
+require_grep '^ARG MC_VERSION=' Dockerfile \
+  "Dockerfile must expose MC_VERSION build input"
+require_grep '^ARG MC_SHA256_AMD64=[0-9a-f]{64}$' Dockerfile \
+  "Dockerfile must pin the MinIO client amd64 checksum"
+require_grep '^ARG MC_SHA256_ARM64=[0-9a-f]{64}$' Dockerfile \
+  "Dockerfile must pin the MinIO client arm64 checksum"
 require_grep '^FROM cozedev/coze-studio-server:\$\{COZE_SERVER_TAG\} AS coze-server$' Dockerfile \
   "Dockerfile must select server image from COZE_SERVER_TAG"
 require_grep '^FROM cozedev/coze-studio-web:\$\{COZE_WEB_TAG\} AS coze-web$' Dockerfile \
@@ -313,16 +325,14 @@ require_grep 'denoland/deno/releases/download/v\$\{DENO_VERSION\}' Dockerfile \
   "Dockerfile must select Deno version from DENO_VERSION"
 require_grep 'verify_sha256 "\$deno_sha" /tmp/deno\.zip' Dockerfile \
   "Dockerfile must verify Deno checksum when provided"
-require_grep 'curl -fsSL "\$ATLAS_INSTALL_URL" -o /tmp/atlas-install\.sh' Dockerfile \
-  "Dockerfile must download Atlas installer to a file before execution"
-require_grep 'verify_sha256 "\$ATLAS_INSTALL_SHA256" /tmp/atlas-install\.sh' Dockerfile \
-  "Dockerfile must verify Atlas installer checksum when provided"
-require_grep 'sh /tmp/atlas-install\.sh -y --community' Dockerfile \
-  "Dockerfile must not pipe Atlas installer directly into sh"
-require_grep 'dl\.min\.io/server/minio/release/linux-\$\{minio_arch\}/minio' Dockerfile \
-  "Dockerfile must keep MinIO server URL visible for release pin audit"
-require_grep 'dl\.min\.io/client/mc/release/linux-\$\{minio_arch\}/mc' Dockerfile \
-  "Dockerfile must keep MinIO client URL visible for release pin audit"
+require_grep 'atlas-community-linux-\$\{atlas_arch\}-\$\{ATLAS_VERSION\}' Dockerfile \
+  "Dockerfile must select the pinned Atlas version"
+require_grep 'verify_sha256 "\$atlas_sha" /usr/local/bin/atlas' Dockerfile \
+  "Dockerfile must verify the Atlas binary checksum"
+require_grep 'dl\.min\.io/server/minio/release/linux-\$\{minio_arch\}/archive/minio\.\$\{MINIO_VERSION\}' Dockerfile \
+  "Dockerfile must select the pinned MinIO version"
+require_grep 'dl\.min\.io/client/mc/release/linux-\$\{minio_arch\}/archive/mc\.\$\{MC_VERSION\}' Dockerfile \
+  "Dockerfile must select the pinned MinIO client version"
 require_grep 'verify_sha256 "\$minio_sha" /usr/local/bin/minio' Dockerfile \
   "Dockerfile must verify MinIO server checksum when provided"
 require_grep 'verify_sha256 "\$mc_sha" /usr/local/bin/mc' Dockerfile \
@@ -378,6 +388,10 @@ require_grep 'tokens are not accepted in URLs' hfs/bin/ops_service.py \
   "ops dashboard must reject query-string tokens"
 require_grep 'emit CODE_RUNNER_TYPE "sandbox"' hfs/bin/render-env.sh \
   "Coze v0.5.1 must explicitly use the sandbox code runner"
+require_grep 'emit PERSISTENCE_REQUIRED "false"' hfs/bin/render-env.sh \
+  "persistence enforcement must stay opt-in until a volume is mounted"
+require_grep 'persistent_data' hfs/bin/ops_service.py \
+  "ops health must expose the persistent data mount check"
 require_grep 'location \^~ /api/admin/' hfs/conf/nginx.conf \
   "nginx must block the fail-open Coze v0.5.1 admin API"
 require_grep 'admin-disabled-root' scripts/admin-smoke.sh \

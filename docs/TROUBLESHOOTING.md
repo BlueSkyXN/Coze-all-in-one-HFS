@@ -153,6 +153,16 @@ BUILTIN_CM_OPENAI_MODEL
 
 API key 必须放 HF Secrets。Base URL 如果包含私有网关、租户或 token，也按 Secret 管理。
 
+## `/data/coze` 没有持久化
+
+HF models、datasets 和 spaces volume 是只读挂载；Coze 数据目录必须使用 read-write bucket volume。挂载后设置：
+
+```text
+PERSISTENCE_REQUIRED=true
+```
+
+如果 `/_ops/healthz` 返回 `checks.persistent_data=false`，说明 `/data/coze` 没有作为独立 mount 生效。不要关闭门禁后继续写 overlay filesystem；应检查 `hf spaces volumes list` 和 bucket 权限。
+
 ## 文件上传 URL 模型不可读
 
 本地 MinIO fallback 只为 P0/P1 演示保留。真实上传、多模态或模型可读 URL 建议配置 S3/TOS/ImageX：

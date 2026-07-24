@@ -48,9 +48,9 @@
 - Coze image tags：`COZE_SERVER_TAG`、`COZE_WEB_TAG`
 - Coze upstream config ref：`COZE_GIT_REF`
 - Runtime dependency images：`ELASTICSEARCH_IMAGE`、`ETCD_IMAGE`、`MILVUS_IMAGE`
-- Downloaded artifacts：Deno、Atlas installer、MinIO server、MinIO client
+- Downloaded artifacts：Deno、Atlas CLI、MinIO server、MinIO client
 
-当前 Coze server/web 默认值已经使用 `v0.5.1` 的 `tag@sha256:...` manifest digest，`COZE_GIT_REF=v0.5.1` 与其保持同一 release。依赖镜像和下载型 artifact 仍需继续收敛到 digest/checksum 可验证的形式。Dockerfile 不直接执行 `curl | sh`，下载型 artifact 会在 checksum build arg 存在时先校验再安装。
+当前 Coze server/web 默认值使用 `v0.5.1` 的 `tag@sha256:...` manifest digest，`COZE_GIT_REF=v0.5.1` 与其保持同一 release。Elasticsearch、etcd、Milvus 也使用 manifest digest；Deno、Atlas CLI、MinIO 和 MC 使用固定版本及 amd64/arm64 SHA-256。Dockerfile 不执行 `curl | sh`，下载型 artifact 在安装前必须通过 checksum。
 
 ## Upstream Tracking Snapshot
 
@@ -60,7 +60,7 @@
 - upstream `main@22275b1c2661d35344a7493cffe401e8cc61cf8e` 比 `v0.5.1` 多 8 个未发布 commit，但没有对应的新 server/web image pair，不能把 `COZE_GIT_REF` 单独切到 `main` 后声称完成适配。
 - wrapper 已等价吸收可由配置层完成的 `8de249d`：生成环境显式设置 `CODE_RUNNER_TYPE=sandbox`。
 - wrapper 暂时阻断 `/admin` 和 `/api/admin/*`，缓解 `5aaf6d5` 修复前的 upstream admin fail-open。SQL injection、OAuth nonce/phishing 和 workflow resume 修复属于 upstream binary 变化，必须等待匹配 release 或改用经过审计的自建 server/web 镜像。
-- 未来 release bump 前必须再次检查 Atlas/schema 变化；当前 bootstrap marker 只覆盖首次初始化，不能把换 binary 等同于完成持久化数据库 migration。
+- MySQL 初始化记录 pinned HCL 的 SHA-256。旧 `.coze_bootstrap_done` 数据目录或 schema 指纹变化时会启动临时 MariaDB 并执行 `atlas schema apply`；Atlas 失败会阻止启动且不会推进 marker，避免把换 binary 误报为完成持久化数据库 migration。
 
 ## Local-Only Materials
 
