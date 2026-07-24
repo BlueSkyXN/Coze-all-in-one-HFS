@@ -6,6 +6,7 @@ import sys
 import tempfile
 import threading
 import unittest
+from unittest import mock
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 
@@ -85,6 +86,30 @@ class OpsServiceTests(unittest.TestCase):
         self.assertEqual(code, 503)
         self.assertEqual(payload["status"], "degraded")
         self.assertFalse(payload["checks"]["coze_server"])
+
+    def test_health_payload_fails_when_required_persistence_is_not_mounted(self):
+        ops_service.tcp_check = lambda host, port, timeout=1.0: True
+        with tempfile.TemporaryDirectory() as tmpdir:
+            ops_service.DATA_DIR = Path(tmpdir)
+            os.environ["PERSISTENCE_REQUIRED"] = "true"
+            with mock.patch.object(ops_service.os.path, "ismount", return_value=False):
+                code, payload = ops_service.health_payload()
+
+        self.assertEqual(code, 503)
+        self.assertFalse(payload["checks"]["persistent_data"])
+        self.assertEqual(payload["persistence"], {"required": True, "mounted": False})
+
+    def test_health_payload_reports_required_persistent_mount(self):
+        ops_service.tcp_check = lambda host, port, timeout=1.0: True
+        with tempfile.TemporaryDirectory() as tmpdir:
+            ops_service.DATA_DIR = Path(tmpdir)
+            os.environ["PERSISTENCE_REQUIRED"] = "true"
+            with mock.patch.object(ops_service.os.path, "ismount", return_value=True):
+                code, payload = ops_service.health_payload()
+
+        self.assertEqual(code, 200)
+        self.assertTrue(payload["checks"]["persistent_data"])
+        self.assertEqual(payload["persistence"], {"required": True, "mounted": True})
 
     def test_handler_returns_404_for_unknown_route(self):
         server = ThreadingHTTPServer(("127.0.0.1", 0), QuietHandler)

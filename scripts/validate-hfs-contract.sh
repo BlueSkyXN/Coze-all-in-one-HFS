@@ -388,6 +388,10 @@ require_grep 'tokens are not accepted in URLs' hfs/bin/ops_service.py \
   "ops dashboard must reject query-string tokens"
 require_grep 'emit CODE_RUNNER_TYPE "sandbox"' hfs/bin/render-env.sh \
   "Coze v0.5.1 must explicitly use the sandbox code runner"
+require_grep 'emit PERSISTENCE_REQUIRED "false"' hfs/bin/render-env.sh \
+  "persistence enforcement must stay opt-in until a volume is mounted"
+require_grep 'persistent_data' hfs/bin/ops_service.py \
+  "ops health must expose the persistent data mount check"
 require_grep 'location \^~ /api/admin/' hfs/conf/nginx.conf \
   "nginx must block the fail-open Coze v0.5.1 admin API"
 require_grep 'admin-disabled-root' scripts/admin-smoke.sh \

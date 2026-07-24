@@ -41,6 +41,10 @@ class RenderEnvTests(unittest.TestCase):
         self.assertIn("export CODE_RUNNER_TYPE=local\n", rendered)
         self.assertIn("export CODE_RUNNER_TIMEOUT_SECONDS=15\n", rendered)
 
+    def test_persistence_gate_defaults_off_and_allows_override(self):
+        self.assertIn("export PERSISTENCE_REQUIRED=false\n", self.render())
+        self.assertIn("export PERSISTENCE_REQUIRED=true\n", self.render(PERSISTENCE_REQUIRED="true"))
+
 
 if __name__ == "__main__":
     unittest.main()

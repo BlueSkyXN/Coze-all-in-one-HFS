@@ -7,11 +7,6 @@ on:
         description: Exact coze-dev/coze-studio commit to build
         required: true
         default: 22275b1c2661d35344a7493cffe401e8cc61cf8e
-  push:
-    branches:
-      - codex/resolve-discovered-issues
-    paths:
-      - .github/workflows/build-pinned-coze.yml
 
 permissions:
   contents: read
@@ -65,7 +60,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: coze-server-${{ env.UPSTREAM_REF }}
-          path: artifact/
+          path: |
+            artifact/coze-server-app-*.tar.gz
+            artifact/SHA256SUMS-server
+            artifact/coze-server-build.json
           if-no-files-found: error
           retention-days: 14
 
@@ -119,6 +117,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: coze-web-${{ env.UPSTREAM_REF }}
-          path: artifact/
+          path: |
+            artifact/coze-web-dist-*.tar.gz
+            artifact/SHA256SUMS-web
+            artifact/coze-web-build.json
           if-no-files-found: error
           retention-days: 14

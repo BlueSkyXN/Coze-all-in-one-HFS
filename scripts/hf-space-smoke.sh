@@ -10,6 +10,7 @@ OPS_TOKEN="${OPS_TOKEN:-}"
 ADMIN_TOKEN="${ADMIN_TOKEN:-}"
 SMOKE_ADMIN_ENABLED="${SMOKE_ADMIN_ENABLED:-${ADMIN_ENABLED:-false}}"
 SMOKE_ADMIN_ACTIONS="${SMOKE_ADMIN_ACTIONS:-false}"
+SMOKE_PERSISTENCE_REQUIRED="${SMOKE_PERSISTENCE_REQUIRED:-${PERSISTENCE_REQUIRED:-false}}"
 
 tmp_body=$(mktemp)
 tmp_headers=$(mktemp)
@@ -51,12 +52,13 @@ check_no_x_frame_options() {
 }
 
 check_ops_health_json() {
-  python3 - "$tmp_body" <<'PY'
+  python3 - "$tmp_body" "$SMOKE_PERSISTENCE_REQUIRED" <<'PY'
 import json
 import sys
 from pathlib import Path
 
 payload = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+expect_persistence = sys.argv[2].lower() in {"1", "true", "yes", "on"}
 if payload.get("status") != "ok":
     raise SystemExit(f"ops status is not ok: {payload.get('status')!r}")
 if payload.get("code_runner_type") != "sandbox":
@@ -67,8 +69,16 @@ if not isinstance(checks, dict) or not checks:
 failed = sorted(name for name, ok in checks.items() if ok is not True)
 if failed:
     raise SystemExit("ops checks failed: " + ", ".join(failed))
+if expect_persistence:
+    persistence = payload.get("persistence")
+    if persistence != {"required": True, "mounted": True}:
+        raise SystemExit(f"persistent data mount is not enforced: {persistence!r}")
 PY
-  printf 'PASS ops-health-json: status ok, code runner sandbox, and all checks true\n'
+  printf 'PASS ops-health-json: status ok, code runner sandbox, and all checks true'
+  if [ "$SMOKE_PERSISTENCE_REQUIRED" = "true" ]; then
+    printf ', including required persistent mount'
+  fi
+  printf '\n'
 }
 
 check_ops() {

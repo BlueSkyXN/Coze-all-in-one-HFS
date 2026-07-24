@@ -53,6 +53,7 @@ DEFAULT_SERVICE_LOGS = {
 
 SAFE_CONFIG_KEYS = [
     "DATA_DIR",
+    "PERSISTENCE_REQUIRED",
     "COZE_PUBLIC_URL",
     "SPACE_HOST",
     "SPACE_ID",
@@ -142,6 +143,12 @@ def parse_int(value: Any, default: int, minimum: int | None = None, maximum: int
     return parsed
 
 
+def parse_bool(value: Any, default: bool = False) -> bool:
+    if value is None or value == "":
+        return default
+    return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+
 def truncate_text(value: str, limit: int = 4096) -> str:
     if len(value) <= limit:
         return value
@@ -170,6 +177,8 @@ def tcp_check(host: str, port: int, timeout: float = 1.0) -> bool:
 
 
 def health_checks() -> dict[str, bool]:
+    persistence_required = parse_bool(env("PERSISTENCE_REQUIRED"), default=False)
+    persistent_mount = os.path.ismount(DATA_DIR)
     checks = {
         "mariadb": tcp_check("127.0.0.1", int(env("MYSQL_PORT", "3306"))),
         "redis": tcp_check("127.0.0.1", 6379),
@@ -179,6 +188,7 @@ def health_checks() -> dict[str, bool]:
         "milvus": tcp_check("127.0.0.1", 19530),
         "coze_server": tcp_check("127.0.0.1", 8888),
         "data_dir": DATA_DIR.exists() and os.access(DATA_DIR, os.W_OK),
+        "persistent_data": persistent_mount if persistence_required else True,
     }
     if env("ENABLE_LOCAL_MINIO", "1") == "1":
         checks["minio"] = tcp_check("127.0.0.1", 9000)
@@ -197,6 +207,10 @@ def health_payload() -> tuple[int, dict[str, Any]]:
         "uptime_seconds": int(time.time() - STARTED_AT),
         "checks": checks,
         "data_dir": str(DATA_DIR),
+        "persistence": {
+            "required": parse_bool(env("PERSISTENCE_REQUIRED"), default=False),
+            "mounted": os.path.ismount(DATA_DIR),
+        },
         "public_url": env("COZE_PUBLIC_URL") or env("SPACE_HOST"),
         "code_runner_type": env("CODE_RUNNER_TYPE"),
     }

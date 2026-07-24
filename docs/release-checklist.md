@@ -41,6 +41,8 @@ git diff --check
 
 `ENABLE_LOCAL_MINIO=0` 只适合已经提供外部 object storage 的场景。只要继续使用内置 Milvus，就必须保证 `MINIO_ADDRESS` 指向一个 Milvus 可访问的对象存储 endpoint，并提前准备好 `MINIO_BUCKET_NAME` 对应 bucket。
 
+如果 `/data/coze` 已挂载 read-write HF bucket volume，同时设置 `PERSISTENCE_REQUIRED=true`。此后 canonical health 会把 mount 丢失视为 503，避免在 overlay filesystem 上静默启动并误报持久化正常。线上 smoke 使用 `SMOKE_PERSISTENCE_REQUIRED=true` 回读该门禁。
+
 ## 4. Remote Sync
 
 确认 GitHub 和 Hugging Face remote 分层：
