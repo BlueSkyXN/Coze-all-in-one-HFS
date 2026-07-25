@@ -16,12 +16,7 @@ mkdir -p \
   "$DATA_DIR/elasticsearch" \
   "$DATA_DIR/etcd" \
   "$DATA_DIR/milvus" \
-  "$DATA_DIR/logs" \
-  "$DATA_DIR/nginx/proxy_temp" \
-  "$DATA_DIR/nginx/client_body_temp" \
-  "$DATA_DIR/nginx/fastcgi_temp" \
-  "$DATA_DIR/nginx/uwsgi_temp" \
-  "$DATA_DIR/nginx/scgi_temp"
+  "$DATA_DIR/logs"
 
 echo "[entrypoint] rendering env"
 /opt/coze-hfs/bin/render-env.sh
@@ -35,13 +30,8 @@ chown user:user \
   "$DATA_DIR/nats" \
   "$DATA_DIR/minio" \
   "$DATA_DIR/logs" \
-  "$DATA_DIR/nginx/proxy_temp" \
-  "$DATA_DIR/nginx/client_body_temp" \
-  "$DATA_DIR/nginx/fastcgi_temp" \
-  "$DATA_DIR/nginx/uwsgi_temp" \
-  "$DATA_DIR/nginx/scgi_temp" \
   /run/nginx /var/lib/nginx /var/log/nginx || true
-chown -R user:user "$DATA_DIR/logs" "$DATA_DIR/nginx" || true
+chown -R user:user "$DATA_DIR/logs" || true
 chown -R cozeadmin:cozeadmin "$DATA_DIR/admin"
 
 echo "[entrypoint] bootstrapping MariaDB"

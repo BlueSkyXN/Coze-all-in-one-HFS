@@ -398,6 +398,10 @@ require_grep 'RUN_DIR="\$\{RUN_DIR:-/run/coze\}"' hfs/bin/run-mariadb.sh \
   "mariadb must keep its runtime socket off the data volume"
 require_grep '^file=/run/coze/supervisor\.sock' hfs/conf/supervisord.conf \
   "supervisor control socket must stay off the data volume"
+require_grep '^pid /run/coze/nginx\.pid;' hfs/conf/nginx.conf \
+  "nginx pid file must stay off the data volume"
+require_grep 'proxy_temp_path /var/lib/nginx/tmp/proxy_temp;' hfs/conf/nginx.conf \
+  "nginx temp paths must stay on local container storage"
 require_grep 'location \^~ /api/admin/' hfs/conf/nginx.conf \
   "nginx must block the fail-open Coze v0.5.1 admin API"
 require_grep 'admin-disabled-root' scripts/admin-smoke.sh \
