@@ -53,19 +53,22 @@ local processes:
 | `COZE_SERVER_TAG` | `0.5.1@sha256:bacce3aa...7744` | digest-pinned `cozedev/coze-studio-server` image |
 | `COZE_WEB_TAG` | `0.5.1@sha256:a137a16a...2aea` | digest-pinned `cozedev/coze-studio-web` image |
 | `COZE_GIT_REF` | `v0.5.1` | schema and Atlas source ref |
-| `ELASTICSEARCH_IMAGE` | `bitnamilegacy/elasticsearch:8.18.0` | runtime base image and local ES |
-| `ETCD_IMAGE` | `bitnamilegacy/etcd:3.5` | local etcd for Milvus |
-| `MILVUS_IMAGE` | `milvusdb/milvus:v2.5.10` | local vector store |
+| `ELASTICSEARCH_IMAGE` | `bitnamilegacy/elasticsearch:8.18.0@sha256:4a7d1422...5a38` | digest-pinned runtime base image and local ES |
+| `ETCD_IMAGE` | `bitnamilegacy/etcd:3.5@sha256:1b9977cf...69d0` | digest-pinned local etcd for Milvus |
+| `MILVUS_IMAGE` | `milvusdb/milvus:v2.5.10@sha256:02e1d60d...4379` | digest-pinned local vector store |
 | `DENO_VERSION` | `2.4.5` | Deno binary used by Coze runtime |
-| `ATLAS_INSTALL_URL` | `https://atlasgo.sh` | Optional Atlas installer URL |
+| `ATLAS_VERSION` | `v1.2.0` + amd64/arm64 SHA-256 | checksum-verified Atlas CLI |
+| `MINIO_VERSION` / `MC_VERSION` | fixed releases + amd64/arm64 SHA-256 | checksum-verified MinIO server/client |
 
-Coze server/web 默认镜像已 pin 到 `v0.5.1` 的 manifest digest。依赖镜像和下载 artifact 仍需在生产 release 前继续收敛：Dockerfile 已支持 `DENO_SHA256_*`、`ATLAS_INSTALL_SHA256`、`MINIO_SHA256_*` 和 `MC_SHA256_*` build args；未提供这些 checksum 时不能描述成全链路不可变 release。
+Coze server/web 默认镜像已 pin 到 `v0.5.1` 的 manifest digest；Elasticsearch、etcd、Milvus 同样 digest-pinned，Deno、Atlas、MinIO、MC 使用固定版本加双架构 SHA-256，安装前强制校验，不允许空 checksum。
 
 Coze v0.5.1 的 bootstrap 文件包含 MySQL 8.0 专属 collation `utf8mb4_0900_ai_ci`。本仓库在 build 阶段把 `schema.sql` 和 Atlas HCL 规范化为 `utf8mb4_unicode_ci`，以保持 MariaDB 运行层可启动。首次初始化导入 `schema.sql` 后执行 Atlas reconcile；已存在的数据目录按 HCL SHA-256 判断是否需要 reconcile。Atlas 失败会使启动失败，schema marker 只在成功后原子更新。
 
 ## Persistence
 
 默认持久化边界是 `/data/coze`：
+
+Unix socket 与 PID 文件不属于持久化边界：HF bucket volume 不支持 unix socket（`Bind on unix socket: Function not implemented`），MariaDB、mysql-init 与 supervisord 的 socket/pid 固定在容器内 `RUN_DIR`（默认 `/run/coze`），重建后可安全丢弃。
 
 ```text
 /data/coze/mysql

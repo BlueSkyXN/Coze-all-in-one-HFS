@@ -163,6 +163,8 @@ PERSISTENCE_REQUIRED=true
 
 如果 `/_ops/healthz` 返回 `checks.persistent_data=false`，说明 `/data/coze` 没有作为独立 mount 生效。不要关闭门禁后继续写 overlay filesystem；应检查 `hf spaces volumes list` 和 bucket 权限。
 
+注意：bucket 挂载不支持 unix socket（MariaDB 报 `Bind on unix socket: Function not implemented`）。runtime socket/PID 固定在容器内 `RUN_DIR`（默认 `/run/coze`），不要把这些路径指回 `/data/coze`。
+
 ## 文件上传 URL 模型不可读
 
 本地 MinIO fallback 只为 P0/P1 演示保留。真实上传、多模态或模型可读 URL 建议配置 S3/TOS/ImageX：
