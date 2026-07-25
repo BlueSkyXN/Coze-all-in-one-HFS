@@ -404,6 +404,8 @@ require_grep 'proxy_temp_path /var/lib/nginx/tmp/proxy_temp;' hfs/conf/nginx.con
   "nginx temp paths must stay on local container storage"
 require_grep 'ES_LOCAL_DIR="\$\{ES_LOCAL_DIR:-/var/lib/elasticsearch-data\}"' hfs/bin/run-elasticsearch.sh \
   "elasticsearch node data must stay on local container storage"
+require_grep 'curl -fsS "http://127\.0\.0\.1:9091/healthz"' hfs/bin/run-coze-server.sh \
+  "coze-server must wait for Milvus proxy readiness, not only TCP"
 require_grep 'location \^~ /api/admin/' hfs/conf/nginx.conf \
   "nginx must block the fail-open Coze v0.5.1 admin API"
 require_grep 'admin-disabled-root' scripts/admin-smoke.sh \

@@ -165,6 +165,8 @@ PERSISTENCE_REQUIRED=true
 
 注意：bucket 挂载不支持 unix socket（MariaDB 报 `Bind on unix socket: Function not implemented`）。runtime socket/PID 固定在容器内 `RUN_DIR`（默认 `/run/coze`），不要把这些路径指回 `/data/coze`。
 
+bucket 挂载上的 IO 比本地盘慢，Milvus proxy 就绪时间会变长。Coze Server 对 `Milvus Proxy is not ready yet` 是直接 panic 而非重试，因此 `run-coze-server.sh` 在 TCP 等待之外还会等 `http://127.0.0.1:9091/healthz` 真正就绪；不要删掉这层 readiness gate。
+
 ## 文件上传 URL 模型不可读
 
 本地 MinIO fallback 只为 P0/P1 演示保留。真实上传、多模态或模型可读 URL 建议配置 S3/TOS/ImageX：
