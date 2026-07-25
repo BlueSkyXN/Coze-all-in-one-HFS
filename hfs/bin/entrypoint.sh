@@ -13,7 +13,6 @@ mkdir -p \
   "$DATA_DIR/redis" \
   "$DATA_DIR/nats" \
   "$DATA_DIR/minio" \
-  "$DATA_DIR/elasticsearch" \
   "$DATA_DIR/etcd" \
   "$DATA_DIR/milvus" \
   "$DATA_DIR/logs"

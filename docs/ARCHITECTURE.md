@@ -70,15 +70,15 @@ Coze v0.5.1 的 bootstrap 文件包含 MySQL 8.0 专属 collation `utf8mb4_0900_
 
 Unix socket 与 PID 文件不属于持久化边界：HF bucket volume 不支持 unix socket（`Bind on unix socket: Function not implemented`），MariaDB、mysql-init 与 supervisord 的 socket/pid 固定在容器内 `RUN_DIR`（默认 `/run/coze`），重建后可安全丢弃。
 
+Elasticsearch 节点数据同样不在持久化边界内：bucket 挂载不支持 `chown` 与 Lucene native lock（`AccessDeniedException: node.lock`），ES 数据固定在容器本地 `ES_LOCAL_DIR`（默认 `/var/lib/elasticsearch-data`），索引视为可重建缓存；nginx PID/temp 也固定在容器本地。
+
 ```text
 /data/coze/mysql
 /data/coze/admin
 /data/coze/redis
 /data/coze/nats
 /data/coze/minio
-/data/coze/elasticsearch
 /data/coze/logs
-/data/coze/run
 /data/coze/generated-secrets.env
 ```
 

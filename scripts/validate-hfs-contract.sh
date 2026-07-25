@@ -402,6 +402,8 @@ require_grep '^pid /run/coze/nginx\.pid;' hfs/conf/nginx.conf \
   "nginx pid file must stay off the data volume"
 require_grep 'proxy_temp_path /var/lib/nginx/tmp/proxy_temp;' hfs/conf/nginx.conf \
   "nginx temp paths must stay on local container storage"
+require_grep 'ES_LOCAL_DIR="\$\{ES_LOCAL_DIR:-/var/lib/elasticsearch-data\}"' hfs/bin/run-elasticsearch.sh \
+  "elasticsearch node data must stay on local container storage"
 require_grep 'location \^~ /api/admin/' hfs/conf/nginx.conf \
   "nginx must block the fail-open Coze v0.5.1 admin API"
 require_grep 'admin-disabled-root' scripts/admin-smoke.sh \
