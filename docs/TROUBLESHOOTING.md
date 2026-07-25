@@ -167,6 +167,8 @@ PERSISTENCE_REQUIRED=true
 
 bucket 挂载上的 IO 比本地盘慢，Milvus proxy 就绪时间会变长。Coze Server 对 `Milvus Proxy is not ready yet` 是直接 panic 而非重试，因此 `run-coze-server.sh` 在 TCP 等待之外还会等 `http://127.0.0.1:9091/healthz` 真正就绪；不要删掉这层 readiness gate。
 
+持久化 etcd 会跨容器保留 Milvus 的 session 注册，新容器启动时组件会去拨上一任容器的 IP（`dial tcp 10.x.x.x:53100: i/o timeout`）并退出。`run-milvus.sh` 启动前会清理 `by-dev/meta/session` 前缀（session 本来就是 lease 临时状态），不要改成持久化这些注册。
+
 ## 文件上传 URL 模型不可读
 
 本地 MinIO fallback 只为 P0/P1 演示保留。真实上传、多模态或模型可读 URL 建议配置 S3/TOS/ImageX：

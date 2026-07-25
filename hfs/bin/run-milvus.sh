@@ -7,6 +7,14 @@ DATA_DIR="${DATA_DIR:-/data/coze}"
 
 /opt/coze-hfs/bin/wait-for.sh 127.0.0.1 2379 180
 
+# Bucket-backed etcd outlives container replacement, so stale Milvus session
+# registrations can point at dead container IPs. Sessions are lease-ephemeral
+# by design; clear them so every component re-registers with current IPs.
+if command -v etcdctl >/dev/null 2>&1; then
+  echo "[milvus] clearing stale session registrations in etcd"
+  ETCDCTL_API=3 etcdctl --endpoints=http://127.0.0.1:2379 del "by-dev/meta/session" --prefix || true
+fi
+
 export ETCD_ENDPOINTS="${ETCD_ENDPOINTS:-127.0.0.1:2379}"
 export MINIO_ADDRESS="${MINIO_ADDRESS:-127.0.0.1:9000}"
 export MINIO_BUCKET_NAME="${MINIO_BUCKET_NAME:-${MINIO_DEFAULT_BUCKETS:-milvus}}"
