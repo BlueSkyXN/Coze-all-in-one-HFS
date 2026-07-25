@@ -72,6 +72,8 @@ Unix socket 与 PID 文件不属于持久化边界：HF bucket volume 不支持 
 
 Elasticsearch 节点数据同样不在持久化边界内：bucket 挂载不支持 `chown` 与 Lucene native lock（`AccessDeniedException: node.lock`），ES 数据固定在容器本地 `ES_LOCAL_DIR`（默认 `/var/lib/elasticsearch-data`），索引视为可重建缓存；nginx PID/temp 也固定在容器本地。
 
+Milvus 本地状态（rocksmq/RocksDB）也不能放在 bucket 挂载上，跨重启会出现 `Corruption: force_consistency_checks`；本地状态固定在容器内 `MILVUS_LOCAL_DIR`（默认 `/var/lib/milvus-local`）。向量数据本体在 MinIO、集合元数据在 etcd，二者仍在 `/data/coze` 持久卷上；未 flush 的队列数据视为可丢弃。启动前还会清理 etcd 中上一任容器的 `by-dev/meta/session` 注册。
+
 ```text
 /data/coze/mysql
 /data/coze/admin

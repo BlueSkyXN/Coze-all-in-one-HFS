@@ -4,6 +4,7 @@ set -euo pipefail
 # shellcheck disable=SC1090
 source "${COZE_ENV_FILE:-/app/.env}"
 DATA_DIR="${DATA_DIR:-/data/coze}"
+MILVUS_LOCAL_DIR="${MILVUS_LOCAL_DIR:-/var/lib/milvus-local}"
 
 /opt/coze-hfs/bin/wait-for.sh 127.0.0.1 2379 180
 
@@ -64,10 +65,13 @@ else
   /opt/coze-hfs/bin/wait-for.sh "$minio_host" "$minio_port" 180
 fi
 
-mkdir -p "$DATA_DIR/milvus"
+# Bucket volumes corrupt RocksDB (rocksmq) across restarts; keep Milvus local
+# state on container storage. Committed vector data lives in MinIO and
+# collection metadata in etcd, both of which stay on the persistent volume.
+mkdir -p "$MILVUS_LOCAL_DIR"
 if [ ! -L /var/lib/milvus ]; then
   rm -rf /var/lib/milvus
-  ln -s "$DATA_DIR/milvus" /var/lib/milvus
+  ln -s "$MILVUS_LOCAL_DIR" /var/lib/milvus
 fi
 mkdir -p /var/lib/milvus
 chown -R root:root /var/lib/milvus

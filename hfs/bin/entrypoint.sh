@@ -14,7 +14,6 @@ mkdir -p \
   "$DATA_DIR/nats" \
   "$DATA_DIR/minio" \
   "$DATA_DIR/etcd" \
-  "$DATA_DIR/milvus" \
   "$DATA_DIR/logs"
 
 echo "[entrypoint] rendering env"
