@@ -6,9 +6,10 @@ set -euo pipefail
 source "${COZE_ENV_FILE:-/app/.env}"
 
 DATA_DIR="${DATA_DIR:-/data/coze}"
+RUN_DIR="${RUN_DIR:-/run/coze}"
 MYSQL_DATA_DIR="${MYSQL_DATA_DIR:-$DATA_DIR/mysql}"
-MYSQL_SOCKET="${MYSQL_SOCKET:-$DATA_DIR/run/mysql-init.sock}"
-MYSQL_PID_FILE="${MYSQL_PID_FILE:-$DATA_DIR/run/mysql-init.pid}"
+MYSQL_SOCKET="${MYSQL_SOCKET:-$RUN_DIR/mysql-init.sock}"
+MYSQL_PID_FILE="${MYSQL_PID_FILE:-$RUN_DIR/mysql-init.pid}"
 SCHEMA_SQL="${SCHEMA_SQL:-/opt/coze/bootstrap/schema.sql}"
 SCHEMA_HCL="${SCHEMA_HCL:-/opt/coze/bootstrap/opencoze_latest_schema.hcl}"
 BOOTSTRAP_MARKER="$MYSQL_DATA_DIR/.coze_bootstrap_done"
@@ -60,9 +61,9 @@ if [ ! -s "$SCHEMA_HCL" ]; then
 fi
 SCHEMA_SHA256="$(file_sha256 "$SCHEMA_HCL")"
 
-mkdir -p "$MYSQL_DATA_DIR" "$DATA_DIR/run" "$DATA_DIR/logs"
+mkdir -p "$MYSQL_DATA_DIR" "$RUN_DIR" "$DATA_DIR/logs"
 if [ "$(id -u)" = "0" ]; then
-  chown -R "$MYSQLD_USER:$MYSQLD_USER" "$MYSQL_DATA_DIR" "$DATA_DIR/run" "$DATA_DIR/logs"
+  chown -R "$MYSQLD_USER:$MYSQLD_USER" "$MYSQL_DATA_DIR" "$RUN_DIR" "$DATA_DIR/logs"
 fi
 
 IS_NEW_DATABASE=false

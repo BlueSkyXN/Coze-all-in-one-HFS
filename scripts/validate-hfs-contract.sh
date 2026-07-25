@@ -392,6 +392,12 @@ require_grep 'emit PERSISTENCE_REQUIRED "false"' hfs/bin/render-env.sh \
   "persistence enforcement must stay opt-in until a volume is mounted"
 require_grep 'persistent_data' hfs/bin/ops_service.py \
   "ops health must expose the persistent data mount check"
+require_grep 'RUN_DIR="\$\{RUN_DIR:-/run/coze\}"' hfs/bin/mysql-init.sh \
+  "mysql-init must keep runtime sockets off the data volume"
+require_grep 'RUN_DIR="\$\{RUN_DIR:-/run/coze\}"' hfs/bin/run-mariadb.sh \
+  "mariadb must keep its runtime socket off the data volume"
+require_grep '^file=/run/coze/supervisor\.sock' hfs/conf/supervisord.conf \
+  "supervisor control socket must stay off the data volume"
 require_grep 'location \^~ /api/admin/' hfs/conf/nginx.conf \
   "nginx must block the fail-open Coze v0.5.1 admin API"
 require_grep 'admin-disabled-root' scripts/admin-smoke.sh \

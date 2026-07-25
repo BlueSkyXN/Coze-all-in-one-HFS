@@ -2,10 +2,12 @@
 set -euo pipefail
 
 export DATA_DIR="${DATA_DIR:-/data/coze}"
+export RUN_DIR="${RUN_DIR:-/run/coze}"
 
 echo "[entrypoint] starting Coze HFS runtime with DATA_DIR=$DATA_DIR"
 echo "[entrypoint] ensuring runtime directories"
 mkdir -p \
+  "$RUN_DIR" \
   "$DATA_DIR/admin" \
   "$DATA_DIR/mysql" \
   "$DATA_DIR/redis" \
@@ -15,7 +17,6 @@ mkdir -p \
   "$DATA_DIR/etcd" \
   "$DATA_DIR/milvus" \
   "$DATA_DIR/logs" \
-  "$DATA_DIR/run" \
   "$DATA_DIR/nginx/proxy_temp" \
   "$DATA_DIR/nginx/client_body_temp" \
   "$DATA_DIR/nginx/fastcgi_temp" \
@@ -27,20 +28,20 @@ echo "[entrypoint] rendering env"
 
 echo "[entrypoint] fixing runtime directory ownership"
 chown user:user \
+  "$RUN_DIR" \
   "$DATA_DIR" \
   "$DATA_DIR/mysql" \
   "$DATA_DIR/redis" \
   "$DATA_DIR/nats" \
   "$DATA_DIR/minio" \
   "$DATA_DIR/logs" \
-  "$DATA_DIR/run" \
   "$DATA_DIR/nginx/proxy_temp" \
   "$DATA_DIR/nginx/client_body_temp" \
   "$DATA_DIR/nginx/fastcgi_temp" \
   "$DATA_DIR/nginx/uwsgi_temp" \
   "$DATA_DIR/nginx/scgi_temp" \
   /run/nginx /var/lib/nginx /var/log/nginx || true
-chown -R user:user "$DATA_DIR/logs" "$DATA_DIR/run" "$DATA_DIR/nginx" || true
+chown -R user:user "$DATA_DIR/logs" "$DATA_DIR/nginx" || true
 chown -R cozeadmin:cozeadmin "$DATA_DIR/admin"
 
 echo "[entrypoint] bootstrapping MariaDB"

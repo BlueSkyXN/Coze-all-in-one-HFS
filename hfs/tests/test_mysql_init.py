@@ -23,6 +23,7 @@ class MysqlInitTests(unittest.TestCase):
         existing_database: bool,
         schema_marker: str | None = None,
         atlas_exit: int = 0,
+        run_dir: Path | None = None,
     ) -> tuple[subprocess.CompletedProcess[str], Path, Path, str]:
         data_dir = root / "data"
         mysql_dir = data_dir / "mysql"
@@ -83,13 +84,17 @@ class MysqlInitTests(unittest.TestCase):
                 "COZE_ENV_FILE": str(env_file),
                 "DATA_DIR": str(data_dir),
                 "MYSQL_DATA_DIR": str(mysql_dir),
-                "MYSQL_SOCKET": str(data_dir / "run" / "mysql-init.sock"),
-                "MYSQL_PID_FILE": str(data_dir / "run" / "mysql-init.pid"),
                 "SCHEMA_SQL": str(schema_sql),
                 "SCHEMA_HCL": str(schema_hcl),
                 "PATH": f"{fake_bin}:{env['PATH']}",
             }
         )
+        if run_dir is None:
+            env["RUN_DIR"] = str(data_dir / "run")
+            env["MYSQL_SOCKET"] = str(data_dir / "run" / "mysql-init.sock")
+            env["MYSQL_PID_FILE"] = str(data_dir / "run" / "mysql-init.pid")
+        else:
+            env["RUN_DIR"] = str(run_dir)
         result = subprocess.run(
             ["bash", str(MYSQL_INIT)],
             cwd=ROOT,
@@ -158,6 +163,20 @@ class MysqlInitTests(unittest.TestCase):
                 (mysql_dir / ".coze_schema_sha256").read_text(encoding="utf-8").strip(),
                 fingerprint,
             )
+
+    def test_socket_and_pid_defaults_follow_run_dir(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            run_dir = root / "runtime"
+
+            result, _, command_log, _ = self.run_mysql_init(
+                root, existing_database=True, run_dir=run_dir
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            commands = command_log.read_text(encoding="utf-8")
+            self.assertIn(f"--socket={run_dir}/mysql-init.sock", commands)
+            self.assertIn(f"--pid-file={run_dir}/mysql-init.pid", commands)
 
 
 if __name__ == "__main__":
