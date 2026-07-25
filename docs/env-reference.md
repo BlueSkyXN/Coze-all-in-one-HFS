@@ -2,15 +2,15 @@
 
 `.env.local` 是本机私有 ENV 台账，不是 runtime 自动加载文件，也不是要上传到 GitHub 或 Hugging Face 的 env-file。公开仓库只维护本文件这类 reference：写 key、分类、默认值、建议位置和说明，不写真实值。
 
-当前远端回读时间：2026-07-15。
+当前远端回读时间：2026-07-25。
 
 | 平台 | 当前状态 |
 | --- | --- |
 | GitHub Variables | 未配置 |
 | GitHub Secrets | 未配置 |
 | Hugging Face Variables | `ADMIN_ENABLED`、`CODE_RUNNER_TYPE`、`COZE_PUBLIC_URL`、`DISABLE_USER_REGISTRATION`、`ENABLE_LOCAL_MINIO`、`LOG_LEVEL`、`PERSISTENCE_REQUIRED` |
-| Hugging Face Secrets | 当前 key list 为空；模型、Ops、存储、检索等 secrets 尚未配置 |
-| Hugging Face Space | `private=true`；未配置 persistent volume |
+| Hugging Face Secrets | `OPS_TOKEN`；模型、存储、检索等 secrets 尚未配置 |
+| Hugging Face Space | `private=true`；`/data/coze` 挂载 read-write bucket volume（`hf://buckets/BlueSkyXN/coze-all-in-one-hfs-data`），`PERSISTENCE_REQUIRED=true` |
 
 ## 推荐 HF Variables
 
