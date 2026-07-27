@@ -1,125 +1,354 @@
-name: Build Pinned Coze Artifacts
+name: Build and Publish Coze Runtime Artifacts
 
 on:
   workflow_dispatch:
     inputs:
-      upstream_ref:
-        description: Exact coze-dev/coze-studio commit to build
+      action:
+        description: Build only, publish an edge slot, create a release archive, or promote an existing release.
+        type: choice
         required: true
-        default: 22275b1c2661d35344a7493cffe401e8cc61cf8e
+        default: build
+        options:
+          - build
+          - publish-edge
+          - release
+          - promote-release
+      upstream_ref:
+        description: Exact 40-character coze-dev/coze-studio commit for build, edge publish, or release.
+        required: false
+        type: string
+      release_tag:
+        description: Existing or new GitHub Release tag for release/promote-release.
+        required: false
+        type: string
+      confirmed:
+        description: I confirm the selected remote write operation and required owner gates.
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
 
-env:
-  UPSTREAM_REF: ${{ inputs.upstream_ref || '22275b1c2661d35344a7493cffe401e8cc61cf8e' }}
+concurrency:
+  group: coze-runtime-artifacts-${{ inputs.action }}
+  cancel-in-progress: false
 
 jobs:
-  server:
-    name: Build server runtime artifact
+  validate-input:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    outputs:
+      build_required: ${{ steps.mode.outputs.build_required }}
     steps:
-      - name: Check out pinned Coze source
-        uses: actions/checkout@v4
-        with:
-          repository: coze-dev/coze-studio
-          ref: ${{ env.UPSTREAM_REF }}
-          path: upstream
-          fetch-depth: 1
-
-      - name: Verify source commit
-        working-directory: upstream
-        run: test "$(git rev-parse HEAD)" = "$UPSTREAM_REF"
-
-      - name: Build upstream server image
-        run: docker build --platform linux/amd64 -f upstream/backend/Dockerfile -t coze-pinned-server upstream
-
-      - name: Export server application
+      - id: mode
         shell: bash
+        env:
+          ACTION: ${{ inputs.action }}
+          UPSTREAM_REF: ${{ inputs.upstream_ref }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          CONFIRMED: ${{ inputs.confirmed }}
+          CANONICAL_SOURCE_COMMIT: 22275b1c2661d35344a7493cffe401e8cc61cf8e
         run: |
           set -euo pipefail
-          short_ref="${UPSTREAM_REF:0:12}"
-          container="$(docker create coze-pinned-server)"
-          trap 'docker rm -f "$container" >/dev/null 2>&1 || true' EXIT
-          mkdir -p artifact/app
-          docker cp "$container:/app/." artifact/app/
-          tar --sort=name --mtime='UTC 1970-01-01' --owner=0 --group=0 --numeric-owner \
-            -C artifact/app -czf "artifact/coze-server-app-${short_ref}.tar.gz" .
-          sha256sum "artifact/coze-server-app-${short_ref}.tar.gz" > artifact/SHA256SUMS-server
-          jq -n \
-            --arg component server \
-            --arg upstream_repo coze-dev/coze-studio \
-            --arg upstream_ref "$UPSTREAM_REF" \
-            --arg dockerfile_sha256 "$(sha256sum upstream/backend/Dockerfile | awk '{print $1}')" \
-            --arg workflow_run "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
-            '{component:$component,upstream_repo:$upstream_repo,upstream_ref:$upstream_ref,dockerfile_sha256:$dockerfile_sha256,workflow_run:$workflow_run}' \
-            > artifact/coze-server-build.json
+          action="$ACTION"
+          ref="$UPSTREAM_REF"
+          tag="$RELEASE_TAG"
+          confirmed="$CONFIRMED"
+          case "$action" in
+            build|publish-edge|release)
+              [[ "$ref" =~ ^[0-9a-f]{40}$ ]] || { echo "upstream_ref must be a full lowercase Git commit" >&2; exit 1; }
+              [[ "$ref" == "$CANONICAL_SOURCE_COMMIT" ]] || { echo "upstream_ref must equal the canonical Coze source commit bound into the wrapper" >&2; exit 1; }
+              echo "build_required=true" >> "$GITHUB_OUTPUT"
+              ;;
+            promote-release)
+              [[ -n "$tag" ]] || { echo "release_tag is required for promotion" >&2; exit 1; }
+              echo "build_required=false" >> "$GITHUB_OUTPUT"
+              ;;
+            *) echo "unsupported action" >&2; exit 1 ;;
+          esac
+          if [[ "$action" != build ]]; then
+            [[ "$confirmed" == true ]] || { echo "remote publication requires confirmed=true" >&2; exit 1; }
+          fi
+          if [[ "$action" == release ]]; then
+            [[ -n "$tag" ]] || { echo "release_tag is required when creating a GitHub Release" >&2; exit 1; }
+          fi
 
-      - name: Upload server artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: coze-server-${{ env.UPSTREAM_REF }}
-          path: |
-            artifact/coze-server-app-*.tar.gz
-            artifact/SHA256SUMS-server
-            artifact/coze-server-build.json
-          if-no-files-found: error
-          retention-days: 14
-
-  web:
-    name: Build web runtime artifact
+  build-component:
+    needs: validate-input
+    if: needs.validate-input.outputs.build_required == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - component: server
+            dockerfile: backend/Dockerfile
+            container_path: /app/.
+            artifact_prefix: coze-server-app
+          - component: web
+            dockerfile: frontend/Dockerfile
+            container_path: /usr/share/nginx/html/.
+            artifact_prefix: coze-web-dist
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
-      - name: Check out pinned Coze source
-        uses: actions/checkout@v4
+      - name: Check out exact upstream source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           repository: coze-dev/coze-studio
-          ref: ${{ env.UPSTREAM_REF }}
+          ref: ${{ inputs.upstream_ref }}
           path: upstream
           fetch-depth: 1
 
-      - name: Verify source commit
+      - name: Verify immutable source commit
         working-directory: upstream
+        shell: bash
+        env:
+          UPSTREAM_REF: ${{ inputs.upstream_ref }}
         run: test "$(git rev-parse HEAD)" = "$UPSTREAM_REF"
 
-      - name: Reclaim runner disk
-        run: |
-          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc
-          docker system prune -af || true
-
-      - name: Build upstream web image
-        run: docker build --platform linux/amd64 -f upstream/frontend/Dockerfile -t coze-pinned-web upstream
-
-      - name: Export web application
+      - name: Build upstream component image
         shell: bash
+        run: docker build --platform linux/amd64 -f "upstream/${{ matrix.dockerfile }}" -t "coze-runtime-${{ matrix.component }}" upstream
+
+      - name: Export deterministic component bundle and provenance
+        shell: bash
+        env:
+          COMPONENT: ${{ matrix.component }}
+          CONTAINER_PATH: ${{ matrix.container_path }}
+          ARTIFACT_PREFIX: ${{ matrix.artifact_prefix }}
+          UPSTREAM_REF: ${{ inputs.upstream_ref }}
         run: |
           set -euo pipefail
-          short_ref="${UPSTREAM_REF:0:12}"
-          container="$(docker create coze-pinned-web)"
+          container="$(docker create "coze-runtime-${COMPONENT}")"
           trap 'docker rm -f "$container" >/dev/null 2>&1 || true' EXIT
-          mkdir -p artifact/dist
-          docker cp "$container:/usr/share/nginx/html/." artifact/dist/
+          mkdir -p "artifact/${COMPONENT}"
+          docker cp "$container:${CONTAINER_PATH}" "artifact/${COMPONENT}/"
+          artifact="${ARTIFACT_PREFIX}-${UPSTREAM_REF}.tar.gz"
           tar --sort=name --mtime='UTC 1970-01-01' --owner=0 --group=0 --numeric-owner \
-            -C artifact/dist -czf "artifact/coze-web-dist-${short_ref}.tar.gz" .
-          sha256sum "artifact/coze-web-dist-${short_ref}.tar.gz" > artifact/SHA256SUMS-web
-          jq -n \
-            --arg component web \
-            --arg upstream_repo coze-dev/coze-studio \
-            --arg upstream_ref "$UPSTREAM_REF" \
-            --arg dockerfile_sha256 "$(sha256sum upstream/frontend/Dockerfile | awk '{print $1}')" \
-            --arg workflow_run "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
-            '{component:$component,upstream_repo:$upstream_repo,upstream_ref:$upstream_ref,dockerfile_sha256:$dockerfile_sha256,workflow_run:$workflow_run}' \
-            > artifact/coze-web-build.json
+            -C "artifact/${COMPONENT}" -czf "artifact/${artifact}" .
+          sha256sum "artifact/${artifact}" > "artifact/${artifact}.sha256"
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
 
-      - name: Upload web artifact
-        uses: actions/upload-artifact@v4
+          component = os.environ["COMPONENT"]
+          ref = os.environ["UPSTREAM_REF"]
+          dockerfile = Path("upstream") / ("backend/Dockerfile" if component == "server" else "frontend/Dockerfile")
+          Path(f"artifact/{component}-build.json").write_text(
+              json.dumps(
+                  {
+                      "component": component,
+                      "upstream_repository": "coze-dev/coze-studio",
+                      "source_ref": ref,
+                      "dockerfile": str(dockerfile.relative_to("upstream")),
+                      "dockerfile_sha256": hashlib.sha256(dockerfile.read_bytes()).hexdigest(),
+                  },
+                  sort_keys=True,
+              ) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Upload component bundle for verification
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: coze-web-${{ env.UPSTREAM_REF }}
-          path: |
-            artifact/coze-web-dist-*.tar.gz
-            artifact/SHA256SUMS-web
-            artifact/coze-web-build.json
+          name: coze-runtime-${{ matrix.component }}-${{ inputs.upstream_ref }}
+          path: artifact/
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 7
+
+  verify-runtime:
+    needs: [validate-input, build-component]
+    if: needs.validate-input.outputs.build_required == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Download component bundles
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: coze-runtime-*-${{ inputs.upstream_ref }}
+          path: artifact-input
+          merge-multiple: true
+
+      - name: Assemble manifest and verify artifacts
+        shell: bash
+        env:
+          UPSTREAM_REF: ${{ inputs.upstream_ref }}
+        run: |
+          set -euo pipefail
+          mkdir -p runtime-artifacts
+          cp "artifact-input/coze-server-app-${UPSTREAM_REF}.tar.gz" runtime-artifacts/
+          cp "artifact-input/coze-web-dist-${UPSTREAM_REF}.tar.gz" runtime-artifacts/
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from datetime import UTC, datetime
+          from pathlib import Path
+
+          ref = os.environ["UPSTREAM_REF"]
+          root = Path("runtime-artifacts")
+          artifacts = []
+          for component, name in (
+              ("server", f"coze-server-app-{ref}.tar.gz"),
+              ("web", f"coze-web-dist-{ref}.tar.gz"),
+          ):
+              path = root / name
+              artifacts.append(
+                  {
+                      "component": component,
+                      "artifact": name,
+                      "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+                      "size_bytes": path.stat().st_size,
+                  }
+              )
+          generated_at = datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+          build_source = {
+              "schema_version": 1,
+              "upstream_repository": "coze-dev/coze-studio",
+              "source_kind": "commit",
+              "source_ref": ref,
+              "generated_at": generated_at,
+              "wrapper_repository": os.environ["GITHUB_REPOSITORY"],
+              "wrapper_ref": os.environ["GITHUB_SHA"],
+              "workflow_run_id": os.environ["GITHUB_RUN_ID"],
+              "components": [
+                  json.loads(Path("artifact-input/server-build.json").read_text(encoding="utf-8")),
+                  json.loads(Path("artifact-input/web-build.json").read_text(encoding="utf-8")),
+              ],
+          }
+          build_source_path = root / f"BUILD_SOURCE-{ref}.json"
+          build_source_path.write_text(json.dumps(build_source, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+          build_source_sha256 = hashlib.sha256(build_source_path.read_bytes()).hexdigest()
+          (root / "manifest.json").write_text(
+              json.dumps(
+                  {
+                      "schema_version": 1,
+                      "source_kind": "commit",
+                      "source_ref": ref,
+                      "generated_at": generated_at,
+                      "build_source": build_source_path.name,
+                      "build_source_sha256": build_source_sha256,
+                      "artifacts": artifacts,
+                  },
+                  indent=2,
+                  sort_keys=True,
+              ) + "\n",
+              encoding="utf-8",
+          )
+          PY
+          python3 scripts/verify-runtime-artifacts.py --manifest runtime-artifacts/manifest.json --artifacts-dir runtime-artifacts
+
+      - name: Upload verified runtime set
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: coze-runtime-verified-${{ inputs.upstream_ref }}
+          path: runtime-artifacts/
+          if-no-files-found: error
+          retention-days: 7
+
+  publish-edge:
+    needs: [validate-input, verify-runtime]
+    if: inputs.action == 'publish-edge'
+    runs-on: ubuntu-latest
+    environment: hfs-artifact-publish
+    steps:
+      - name: Download verified runtime set
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: coze-runtime-verified-${{ inputs.upstream_ref }}
+          path: runtime-artifacts
+      - name: Publish artifact-first, read back, then write edge manifest
+        shell: bash
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          UPSTREAM_REF: ${{ inputs.upstream_ref }}
+        run: |
+          set -euo pipefail
+          : "${HF_TOKEN:?HF_TOKEN is required for approved artifact publication}"
+          bucket="hf://buckets/BlueSkyXN/hfs-dist/coze-all-in-one-hfs/edge"
+          cp_bucket() { python3 -m huggingface_hub.cli.hf buckets cp "$1" "$2" --quiet; }
+          cp_bucket "runtime-artifacts/BUILD_SOURCE-${UPSTREAM_REF}.json" "${bucket}/BUILD_SOURCE-${UPSTREAM_REF}.json"
+          cp_bucket "${bucket}/BUILD_SOURCE-${UPSTREAM_REF}.json" runtime-artifacts/readback-BUILD_SOURCE.json
+          cmp runtime-artifacts/BUILD_SOURCE-${UPSTREAM_REF}.json runtime-artifacts/readback-BUILD_SOURCE.json
+          for artifact in "coze-server-app-${UPSTREAM_REF}.tar.gz" "coze-web-dist-${UPSTREAM_REF}.tar.gz"; do
+            cp_bucket "runtime-artifacts/${artifact}" "${bucket}/${artifact}"
+            cp_bucket "${bucket}/${artifact}" "runtime-artifacts/readback-${artifact}"
+            cmp "runtime-artifacts/${artifact}" "runtime-artifacts/readback-${artifact}"
+          done
+          cp_bucket runtime-artifacts/manifest.json "${bucket}/manifest.json"
+          cp_bucket "${bucket}/manifest.json" runtime-artifacts/readback-manifest.json
+          cmp runtime-artifacts/manifest.json runtime-artifacts/readback-manifest.json
+
+  release-archive:
+    needs: [validate-input, verify-runtime]
+    if: inputs.action == 'release'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download verified runtime set
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: coze-runtime-verified-${{ inputs.upstream_ref }}
+          path: runtime-artifacts
+      - name: Create immutable GitHub Release archive and read it back
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          UPSTREAM_REF: ${{ inputs.upstream_ref }}
+        run: |
+          set -euo pipefail
+          gh release create "$RELEASE_TAG" runtime-artifacts/* \
+            --target "$GITHUB_SHA" \
+            --title "Coze runtime ${UPSTREAM_REF}" \
+            --notes "Immutable server/web runtime pair for upstream commit ${UPSTREAM_REF}."
+          gh release view "$RELEASE_TAG" --json tagName,targetCommitish,assets
+          test "$(gh release view "$RELEASE_TAG" --json targetCommitish --jq .targetCommitish)" = "$GITHUB_SHA"
+          mkdir release-readback
+          gh release download "$RELEASE_TAG" --dir release-readback
+          for file in runtime-artifacts/*; do
+            cmp "$file" "release-readback/${file##*/}"
+          done
+
+  promote-release:
+    needs: validate-input
+    if: inputs.action == 'promote-release'
+    runs-on: ubuntu-latest
+    environment: hfs-artifact-publish
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Download and verify the archived release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          mkdir runtime-artifacts
+          gh release download "$RELEASE_TAG" --dir runtime-artifacts
+          python3 scripts/verify-runtime-artifacts.py --manifest runtime-artifacts/manifest.json --artifacts-dir runtime-artifacts
+      - name: Publish artifact-first, read back, then write release manifest
+        shell: bash
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          set -euo pipefail
+          : "${HF_TOKEN:?HF_TOKEN is required for approved artifact publication}"
+          ref="$(python3 -c 'import json; print(json.load(open("runtime-artifacts/manifest.json"))["source_ref"])')"
+          bucket="hf://buckets/BlueSkyXN/hfs-dist/coze-all-in-one-hfs/release"
+          cp_bucket() { python3 -m huggingface_hub.cli.hf buckets cp "$1" "$2" --quiet; }
+          cp_bucket "runtime-artifacts/BUILD_SOURCE-${ref}.json" "${bucket}/BUILD_SOURCE-${ref}.json"
+          cp_bucket "${bucket}/BUILD_SOURCE-${ref}.json" runtime-artifacts/readback-BUILD_SOURCE.json
+          cmp "runtime-artifacts/BUILD_SOURCE-${ref}.json" runtime-artifacts/readback-BUILD_SOURCE.json
+          for artifact in "coze-server-app-${ref}.tar.gz" "coze-web-dist-${ref}.tar.gz"; do
+            cp_bucket "runtime-artifacts/${artifact}" "${bucket}/${artifact}"
+            cp_bucket "${bucket}/${artifact}" "runtime-artifacts/readback-${artifact}"
+            cmp "runtime-artifacts/${artifact}" "runtime-artifacts/readback-${artifact}"
+          done
+          cp_bucket runtime-artifacts/manifest.json "${bucket}/manifest.json"
+          cp_bucket "${bucket}/manifest.json" runtime-artifacts/readback-manifest.json
+          cmp runtime-artifacts/manifest.json runtime-artifacts/readback-manifest.json

@@ -159,6 +159,32 @@ check_admin_action() {
   return 1
 }
 
+check_runtime_provenance_json() {
+  if [ -z "$OPS_TOKEN" ]; then
+    printf 'SKIP ops-version-json: OPS_TOKEN is not set\n'
+    return 0
+  fi
+  python3 - "$tmp_body" <<'PY'
+import json
+import re
+import sys
+from pathlib import Path
+
+payload = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+provenance = payload.get("coze", {}).get("runtime_provenance", {})
+if provenance.get("available") is not True:
+    raise SystemExit("runtime provenance is unavailable")
+if not re.fullmatch(r"[0-9a-f]{40}", provenance.get("source_ref", "")):
+    raise SystemExit("runtime provenance source_ref is not a full commit")
+if not re.fullmatch(r"[0-9a-f]{64}", provenance.get("manifest_sha256", "")):
+    raise SystemExit("runtime provenance manifest checksum is invalid")
+artifacts = provenance.get("artifacts")
+if not isinstance(artifacts, list) or {item.get("component") for item in artifacts if isinstance(item, dict)} != {"server", "web"}:
+    raise SystemExit("runtime provenance does not contain exactly server and web artifacts")
+PY
+  printf 'PASS ops-version-json: immutable runtime provenance is present\n'
+}
+
 check_sign_page() {
   if ! grep -Eiq '(@coze-studio/app|coze)' "$tmp_body"; then
     printf 'FAIL sign-page: response does not look like Coze Web HTML\n' >&2
@@ -185,6 +211,8 @@ else
   fetch_path "admin-disabled" "/_admin/" "404"
 fi
 check_ops "ops-health" "/_ops/health"
+check_ops "ops-version" "/_ops/version"
+check_runtime_provenance_json
 check_ops "ops-system" "/_ops/system"
 check_ops "ops-metrics" "/_ops/metrics"
 check_ops "ops-errors" "/_ops/errors"

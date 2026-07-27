@@ -7,6 +7,7 @@ import hmac
 import html
 import json
 import os
+import re
 import shutil
 import socket
 import time
@@ -21,8 +22,15 @@ HOST = os.environ.get("OPS_HOST", "127.0.0.1")
 PORT = int(os.environ.get("OPS_PORT", "8081"))
 DATA_DIR = Path(os.environ.get("DATA_DIR", "/data/coze"))
 LOG_DIR = Path(os.environ.get("OPS_LOG_DIR", f"{DATA_DIR}/logs"))
+RUNTIME_PROVENANCE_FILE = Path(os.environ.get("COZE_RUNTIME_PROVENANCE_FILE", "/run/coze/runtime-provenance.json"))
 MAX_LOG_LINES = 1000
 MAX_LOG_BYTES = 1024 * 1024
+SOURCE_REF_RE = re.compile(r"^[0-9a-f]{40}$")
+SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+RUNTIME_ARTIFACT_PREFIXES = {
+    "server": "coze-server-app",
+    "web": "coze-web-dist",
+}
 
 DEFAULT_SERVICE_LOGS = {
     "mariadb": "mariadb.log",
@@ -81,6 +89,7 @@ SAFE_CONFIG_KEYS = [
 ]
 
 SECRET_KEYS = [
+    "COZE_RUNTIME_DOWNLOAD_TOKEN",
     "OPS_TOKEN",
     "ADMIN_TOKEN",
     "ADMIN_CSRF_KEY",
@@ -189,6 +198,7 @@ def health_checks() -> dict[str, bool]:
         "coze_server": tcp_check("127.0.0.1", 8888),
         "data_dir": DATA_DIR.exists() and os.access(DATA_DIR, os.W_OK),
         "persistent_data": persistent_mount if persistence_required else True,
+        "runtime_provenance": runtime_provenance_payload()["available"],
     }
     if env("ENABLE_LOCAL_MINIO", "1") == "1":
         checks["minio"] = tcp_check("127.0.0.1", 9000)
@@ -315,6 +325,70 @@ def config_payload() -> dict[str, Any]:
     }
 
 
+def runtime_provenance_payload() -> dict[str, Any]:
+    """Return only a complete, bootstrap-written, non-secret provenance record."""
+    try:
+        raw = json.loads(RUNTIME_PROVENANCE_FILE.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {"available": False}
+    if not isinstance(raw, dict) or raw.get("schema_version") != 1 or raw.get("source_kind") != "commit":
+        return {"available": False}
+    source_ref = raw.get("source_ref")
+    manifest_sha256 = raw.get("manifest_sha256")
+    build_source = raw.get("build_source")
+    artifacts = raw.get("artifacts")
+    if (
+        not isinstance(source_ref, str)
+        or not SOURCE_REF_RE.fullmatch(source_ref)
+        or not isinstance(manifest_sha256, str)
+        or not SHA256_RE.fullmatch(manifest_sha256)
+        or not isinstance(build_source, dict)
+        or not isinstance(artifacts, list)
+        or len(artifacts) != len(RUNTIME_ARTIFACT_PREFIXES)
+    ):
+        return {"available": False}
+    build_source_name = build_source.get("artifact")
+    build_source_sha256 = build_source.get("sha256")
+    if (
+        build_source_name != f"BUILD_SOURCE-{source_ref}.json"
+        or not isinstance(build_source_sha256, str)
+        or not SHA256_RE.fullmatch(build_source_sha256)
+    ):
+        return {"available": False}
+
+    found: set[str] = set()
+    safe_artifacts = []
+    for artifact in artifacts:
+        if not isinstance(artifact, dict):
+            return {"available": False}
+        component = artifact.get("component")
+        name = artifact.get("artifact")
+        digest = artifact.get("sha256")
+        size_bytes = artifact.get("size_bytes")
+        if (
+            component not in RUNTIME_ARTIFACT_PREFIXES
+            or component in found
+            or name != f"{RUNTIME_ARTIFACT_PREFIXES[component]}-{source_ref}.tar.gz"
+            or not isinstance(digest, str)
+            or not SHA256_RE.fullmatch(digest)
+            or not isinstance(size_bytes, int)
+            or size_bytes <= 0
+        ):
+            return {"available": False}
+        found.add(component)
+        safe_artifacts.append({"component": component, "artifact": name, "sha256": digest, "size_bytes": size_bytes})
+    if found != set(RUNTIME_ARTIFACT_PREFIXES):
+        return {"available": False}
+    return {
+        "available": True,
+        "source_kind": "commit",
+        "source_ref": source_ref,
+        "manifest_sha256": manifest_sha256,
+        "build_source": {"artifact": build_source_name, "sha256": build_source_sha256},
+        "artifacts": safe_artifacts,
+    }
+
+
 def version_payload() -> dict[str, Any]:
     return {
         "ok": True,
@@ -324,9 +398,9 @@ def version_payload() -> dict[str, Any]:
             "host": env("SPACE_HOST"),
         },
         "coze": {
-            "server_tag": env("COZE_SERVER_TAG"),
-            "web_tag": env("COZE_WEB_TAG"),
-            "git_ref": env("COZE_GIT_REF"),
+            "bootstrap_source_commit": env("COZE_SOURCE_COMMIT"),
+            "release_label": env("COZE_RELEASE_TAG"),
+            "runtime_provenance": runtime_provenance_payload(),
         },
         "runtime": {
             "data_dir": str(DATA_DIR),

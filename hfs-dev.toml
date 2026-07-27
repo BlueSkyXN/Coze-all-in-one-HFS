@@ -1,124 +1,74 @@
-schema_version = 2
-standard = "hfs-dev"
-pattern = "A"
-runtime_mode = "image-assembly"
-space_root_mode = "repo-root"
-hfs_dir = "."
-public_port = 7860
-canonical_health_endpoint = "/_ops/healthz"
-release_pin_required = true
-dev_mutable_sources_allowed = []
-required_files = [
-  "README.md",
-  "Dockerfile",
-  "hfs-dev.toml",
-  "hfs",
-  "hfs/AGENTS.md",
-  "hfs/bin/ops_service.py",
-  "hfs/bin/admin_service.py",
-  "hfs/bin/run-admin-service.sh",
-  "docs",
-  "docs/hfs-alignment.md",
-  "docs/release-checklist.md",
-  "scripts",
-  "scripts/admin-smoke.sh",
-  "scripts/validate-hfs-contract.sh",
-  "AGENTS.md",
+standard = "2.0"
+project = "coze-all-in-one-hfs"
+space = "BlueSkyXN/Coze-all-in-one-HFS"
+sovereignty = "port"
+# The v2 registry uses artifact because the delivered Coze server/web payloads
+# are artifacts. This remains a hybrid implementation because the reviewable
+# Pattern A wrapper and the verified infrastructure-image deviations stay here.
+lane = "artifact"
+version_source = "commit"
+
+# Local control-plane credentials only. They are never sent to the Space.
+local_only = ["HF_TOKEN", "GH_TOKEN"]
+
+# Key names only; values remain in the protected local .env and/or Space Settings.
+secrets = [
+  "COZE_RUNTIME_DOWNLOAD_TOKEN",
+  "OPS_TOKEN",
+  "ADMIN_TOKEN",
+  "ADMIN_CSRF_KEY",
+  "MODEL_API_KEY_0",
+  "BUILTIN_CM_OPENAI_API_KEY",
+  "OPENAI_EMBEDDING_API_KEY",
+  "S3_ACCESS_KEY",
+  "S3_SECRET_KEY",
+  "ES_PASSWORD",
+  "VIKING_DB_AK",
+  "VIKING_DB_SK",
+  "TOS_ACCESS_KEY",
+  "TOS_SECRET_KEY",
+]
+variables = [
+  "COZE_RUNTIME_MANIFEST_URI",
+  "DISABLE_USER_REGISTRATION",
+  "ALLOW_REGISTRATION_EMAIL",
+  "ENABLE_LOCAL_MINIO",
+  "COZE_PUBLIC_URL",
+  "LOG_LEVEL",
+  "PERSISTENCE_REQUIRED",
+  "CODE_RUNNER_TYPE",
+  "CODE_RUNNER_ALLOW_NET",
+  "CODE_RUNNER_TIMEOUT_SECONDS",
+  "CODE_RUNNER_MEMORY_LIMIT_MB",
+  "ADMIN_ENABLED",
+  "MODEL_PROTOCOL_0",
+  "MODEL_OPENCOZE_ID_0",
+  "MODEL_NAME_0",
+  "MODEL_ID_0",
+  "MODEL_BASE_URL_0",
+  "BUILTIN_CM_TYPE",
+  "BUILTIN_CM_OPENAI_BASE_URL",
+  "BUILTIN_CM_OPENAI_MODEL",
+  "FILE_UPLOAD_COMPONENT_TYPE",
+  "STORAGE_TYPE",
+  "S3_ENDPOINT",
+  "S3_BUCKET_ENDPOINT",
+  "S3_REGION",
+  "STORAGE_BUCKET",
+  "ES_ADDR",
+  "ES_VERSION",
+  "VECTOR_STORE_TYPE",
+  "VIKING_DB_HOST",
+  "VIKING_DB_REGION",
+  "VIKING_DB_SCHEME",
 ]
 
-[[release_pins]]
-name = "COZE_SERVER_TAG"
-type = "image_tag"
-source = "Dockerfile ARG"
-current_dev_default = "0.5.1@sha256:bacce3aa5960a2f18362eac93317e42a8c0dbd125a44ec47519f12a8a27c7744"
-required_for_release = true
-dev_mutable_default_allowed = false
-release_requires_digest = true
-notes = "Used as cozedev/coze-studio-server:${COZE_SERVER_TAG}; keep aligned with COZE_WEB_TAG and COZE_GIT_REF."
+dist_bucket = "hfs-dist"
+# This port has no deployable configuration seed; runtime config stays upstream-managed.
+seed_file = ""
+other_objects = []
 
-[[release_pins]]
-name = "COZE_WEB_TAG"
-type = "image_tag"
-source = "Dockerfile ARG"
-current_dev_default = "0.5.1@sha256:a137a16ab75b871b08911ca87359fc8981b225b63b94cf3e0979069fbd862aea"
-required_for_release = true
-dev_mutable_default_allowed = false
-release_requires_digest = true
-notes = "Used as cozedev/coze-studio-web:${COZE_WEB_TAG}; keep aligned with COZE_SERVER_TAG and COZE_GIT_REF."
-
-[[release_pins]]
-name = "COZE_GIT_REF"
-type = "git_ref"
-source = "Dockerfile ARG"
-current_dev_default = "v0.5.1"
-required_for_release = true
-dev_mutable_default_allowed = false
-release_requires_commit_or_tag = true
-notes = "Controls upstream schema/config downloads from coze-dev/coze-studio."
-
-[[release_pins]]
-name = "ELASTICSEARCH_IMAGE"
-type = "image_ref"
-source = "Dockerfile ARG"
-current_dev_default = "bitnamilegacy/elasticsearch:8.18.0@sha256:4a7d14222c876a87c1ddd38e1128d8e42df80071b09ec54db5c32586c9cf5a38"
-required_for_release = true
-dev_mutable_default_allowed = false
-release_requires_digest = true
-
-[[release_pins]]
-name = "ETCD_IMAGE"
-type = "image_ref"
-source = "Dockerfile ARG"
-current_dev_default = "bitnamilegacy/etcd:3.5@sha256:1b9977cf4cce7546873e0ee50e684c38a38a4e7a27d22086fbd2b8a1b44a69d0"
-required_for_release = true
-dev_mutable_default_allowed = false
-release_requires_digest = true
-
-[[release_pins]]
-name = "MILVUS_IMAGE"
-type = "image_ref"
-source = "Dockerfile ARG"
-current_dev_default = "milvusdb/milvus:v2.5.10@sha256:02e1d60d71ab60f435c60076f4fed2abe59602ecd5e18dcfe229c8c558c4379d"
-required_for_release = true
-dev_mutable_default_allowed = false
-release_requires_digest = true
-
-[[release_pins]]
-name = "DENO_VERSION"
-type = "artifact_version"
-source = "Dockerfile ARG"
-current_dev_default = "2.4.5"
-required_for_release = true
-dev_mutable_default_allowed = false
-release_requires_checksum = true
-checksum_args = ["DENO_SHA256_AMD64", "DENO_SHA256_ARM64"]
-
-[[release_pins]]
-name = "ATLAS_VERSION"
-type = "artifact_version"
-source = "Dockerfile ARG"
-current_dev_default = "v1.2.0"
-required_for_release = true
-dev_mutable_default_allowed = false
-release_requires_checksum = true
-checksum_args = ["ATLAS_SHA256_AMD64", "ATLAS_SHA256_ARM64"]
-
-[[release_pins]]
-name = "MINIO_VERSION"
-type = "artifact_version"
-source = "Dockerfile ARG"
-current_dev_default = "RELEASE.2025-09-07T16-13-09Z"
-required_for_release = true
-dev_mutable_default_allowed = false
-release_requires_checksum = true
-checksum_args = ["MINIO_SHA256_AMD64", "MINIO_SHA256_ARM64"]
-
-[[release_pins]]
-name = "MC_VERSION"
-type = "artifact_version"
-source = "Dockerfile ARG"
-current_dev_default = "RELEASE.2025-08-13T08-35-41Z"
-required_for_release = true
-dev_mutable_default_allowed = false
-release_requires_checksum = true
-checksum_args = ["MC_SHA256_AMD64", "MC_SHA256_ARM64"]
+deviations = [
+  "hybrid-wrapper = Pattern A wrapper remains source-reviewed while only Coze server/web are manifest-selected artifacts.",
+  "business-image = Elasticsearch, etcd, and Milvus remain digest-pinned image inputs until each extraction, dynamic-library, cold-start, and persistence proof is approved.",
+]

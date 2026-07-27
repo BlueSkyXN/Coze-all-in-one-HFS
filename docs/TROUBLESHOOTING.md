@@ -9,23 +9,16 @@ hf spaces info BlueSkyXN/Coze-all-in-one-HFS
 git ls-remote https://huggingface.co/spaces/BlueSkyXN/Coze-all-in-one-HFS refs/heads/main
 ```
 
-## Build 在 Coze 镜像 tag 失败
+## Runtime manifest 或 artifact bootstrap 失败
 
-先确认 tag 存在，再改 build surface：
+`COZE_RUNTIME_MANIFEST_URI` 必须是无 query、fragment、嵌入凭据或 redirect 的直接 HTTPS URL。启动只接受包含完整 40 位 commit、按同一 commit 命名的 `BUILD_SOURCE-<commit>.json` SHA-256、server/web artifact SHA-256 与 size 的 manifest。检查顺序：
 
-```bash
-git ls-remote --tags https://github.com/coze-dev/coze-studio.git 'refs/tags/v0.5.1'
-```
+1. 用 `scripts/verify-runtime-artifacts.py --manifest <manifest> --artifacts-dir <dir>` 在发布前复验 Release 文件。
+2. 确认 manifest、commit-named `BUILD_SOURCE-<commit>.json`、server 和 web 已 artifact-first 上传并逐字节 readback；manifest 必须最后写入。
+3. 若下载面私有，确认 `COZE_RUNTIME_DOWNLOAD_TOKEN` 仅作为 Space Secret 存在，并且 endpoint 支持 header bearer auth；不要把 token 放 URL。
+4. 从受 `OPS_TOKEN` 保护的 `/_ops/version` 回读 source commit、manifest checksum 和 artifact checksums，不要从日志或 URL 查 token。
 
-Dockerfile 默认：
-
-```text
-COZE_SERVER_TAG=0.5.1
-COZE_WEB_TAG=0.5.1
-COZE_GIT_REF=v0.5.1
-```
-
-三者必须保持同一上游版本线。
+不允许通过旧 `/app`、缓存、目录扫描、`latest` 或备用 URI 让容器继续启动。`COZE_SOURCE_COMMIT` 同时绑定 schema、Atlas HCL 与 server/web runtime artifact；`COZE_RELEASE_TAG=v0.5.1` 仅是描述性 label，不能替代 commit provenance。
 
 ## DB schema import fails
 

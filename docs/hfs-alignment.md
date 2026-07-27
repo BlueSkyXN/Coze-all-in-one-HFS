@@ -1,86 +1,60 @@
 # HFS Alignment
 
-本文件记录当前仓库与 HFS 开发范式的对齐合同，只写公开可传播的信息，不记录 `.env.local` 明文、真实 token、私有 endpoint 或本机路径。
+本文件只记录可公开传播的 HFS 运行合同；不记录 `.env` / `.env.local` 明文、token、私有 endpoint 或本机路径。
 
 ## Contract
 
 - Pattern A: HFS Port Repository
-- Runtime mode: image-assembly
+- HFS v2 registry: `hfs-dev.toml` (`standard = "2.0"`)
+- Delivery lane: `artifact` registry with a hybrid implementation
 - Space root: repo root
 - Public port: `7860`
 - Canonical health endpoint: `/_ops/healthz`
 
-仓库根目录同时是 GitHub 维护根和 Hugging Face Space root。不要把部署入口迁移到 `cloud/hfs/` 或其他二级目录；HF 构建应直接读取根目录的 `README.md`、`Dockerfile` 和 `.dockerignore`。
+仓库根目录同时是 GitHub 维护根和 Hugging Face Space root。reviewable wrapper 包含 `Dockerfile`、`hfs/`、docs 和 local gates；Space build context 不包含产品源码、`.env*`、`local/`、cache、generated data 或 credentials。
 
-## Source Of Truth
+`hfs-dev.toml` 只登记 HFS v2 的项目关系、车道和 Setting 键名。上游 ref、镜像 digest、checksum、bootstrap 和 runtime invariants 的事实源仍是 `Dockerfile`、`hfs/bin/bootstrap_runtime.py` 与构建 workflow；不要把它们复制到 manifest 形成第二份 pin 表。
 
-本仓库不复制 Coze Studio 源码。上游事实源分为三层：
+## Hybrid Runtime Boundary
 
-- Coze runtime 镜像：`cozedev/coze-studio-server` 与 `cozedev/coze-studio-web`。
-- Coze bootstrap 文件：`coze-dev/coze-studio` 中与 `COZE_GIT_REF` 对齐的 schema/config。
-- HFS wrapper：本仓库的 `Dockerfile`、`hfs/`、`scripts/`、`docs/` 和 `hfs-dev.toml`。
+Coze server 与 web 是不可变 runtime artifacts。启动时 `bootstrap_runtime.py`：
 
-文档以当前 wrapper 代码为准：端口和路径先看 `Dockerfile`、`hfs/conf/nginx.conf`、`hfs/conf/supervisord.conf`、`hfs/bin/*` 和 `hfs/bin/ops_service.py`，再回写 README/docs。
+1. 只读取一次 `COZE_RUNTIME_MANIFEST_URI` 指向的直接 HTTPS `manifest.json`；URL 不允许 query、fragment、嵌入凭据或 redirect。
+2. 只接受 `schema_version=1`、完整 40 位 Git commit、按该 commit 命名的 `BUILD_SOURCE-<commit>.json` checksum，以及恰好一份 server 和 web artifact。
+3. 从 manifest 同目录下载按 commit 命名的 `BUILD_SOURCE-<commit>.json`、server 和 web；分别校验 SHA-256、size、完整 component provenance、tar path/link/device/privileged-mode safety、解包上限与必需入口文件。两个 payload 先共同完成 staging 与动态库验证，再安装；任一替换失败会恢复两个先前目录。
+4. 仅将成功校验的 payload 原子安装至 `/app` 与 `/opt/coze-web`。下载和解包临时文件只在 `/tmp`，不会写入 `/data/coze`。
+5. 任一 manifest、网络、checksum、size、archive、动态库或安装错误都会非零退出；不会扫描目录、使用 `latest`、旧 `/app`、本地缓存或备用 URI。
 
-## Runtime Shape
+`COZE_RUNTIME_DOWNLOAD_TOKEN` 是可选 Space Secret，仅以 Authorization header 发送，不进入 URL、日志或 provenance。私有 `hfs-dist` 的实际直连 URL / access model 必须在发布前由 owner 验证；不能以非空 token 或网页可见性代替 readback。
 
-容器内由 Supervisor 管理 MariaDB、Redis、NATS、MinIO fallback、etcd、Elasticsearch、Milvus、Coze Server、ops service、admin service 和 Nginx。外部只通过 Nginx `7860` 进入：
+`/_ops/version`（受 `OPS_TOKEN` 保护）仅返回 bootstrap 写入的 source commit、manifest checksum、artifact name/checksum/size。不会返回 manifest URL、下载 token 或其他 Secret。
 
-```text
-/nginx-health          shallow Nginx health
-/_ops/healthz          read-only HFS runtime health JSON
-/_ops/readyz           same health payload
-/_ops/status           same health payload
-/_ops/                 token-protected read-only ops dashboard/API
-/_admin/               default-off admin dashboard/API
-/sign                  Coze Web login entry
-/api, /v1, /v2         Coze Server proxy
-/admin, /api/admin/*    blocked until upstream admin auth is fail-closed
-/local_storage/        optional MinIO fallback proxy
-```
+## Immutable Artifact Publication
 
-`/_ops/*` 只保留 read-only diagnostics。`/_admin/*` 是独立管理入口，默认关闭，使用独立 `ADMIN_TOKEN`、白名单 action、`confirm=true`、cookie CSRF 和 audit log。不要在 `/_ops` 下加入 shell、SQL、restart、delete、secret rotation、配置写入或任意命令执行能力；不要在 `/_admin` 下加入任意 shell command 或不受白名单约束的写能力。
+`.github/workflows/build-pinned-coze.yml` 只支持手动触发：
 
-## Release Pins
+- `build`：以显式 40 位 `upstream_ref` 构建并验证成对 server/web bundle；不写远端。
+- `publish-edge`：必须 `confirmed=true`，先上传 commit-named artifact 和 `BUILD_SOURCE-<commit>.json`、逐项 readback，再最后写 `edge/manifest.json` 并 readback。
+- `release`：必须 `confirmed=true` 与 `release_tag`，将已验证运行时集合存为 GitHub Release 历史归档并 readback。
+- `promote-release`：必须 `confirmed=true`，从 GitHub Release 重新下载并验证后，按 artifact-first / readback / manifest-last 写入 `release/`。
 
-`hfs-dev.toml` 使用 schema v2 的 `[[release_pins]]` 记录所有 release 需要审计的输入：
+槽位约定为 `hfs-dist/coze-all-in-one-hfs/{edge,release}`。artifact 文件名包含完整 source commit；`manifest.json` 是唯一选择器。观察期和明确 owner gate 之后才可删除不再引用的槽位对象；本轮不执行上传、promote、Space 更新或清理。
 
-- Coze image tags：`COZE_SERVER_TAG`、`COZE_WEB_TAG`
-- Coze upstream config ref：`COZE_GIT_REF`
-- Runtime dependency images：`ELASTICSEARCH_IMAGE`、`ETCD_IMAGE`、`MILVUS_IMAGE`
-- Downloaded artifacts：Deno、Atlas CLI、MinIO server、MinIO client
+## Retained Infrastructure Deviations
 
-当前 Coze server/web 默认值使用 `v0.5.1` 的 `tag@sha256:...` manifest digest，`COZE_GIT_REF=v0.5.1` 与其保持同一 release。Elasticsearch、etcd、Milvus 也使用 manifest digest；Deno、Atlas CLI、MinIO 和 MC 使用固定版本及 amd64/arm64 SHA-256。Dockerfile 不执行 `curl | sh`，下载型 artifact 在安装前必须通过 checksum。
+Elasticsearch、etcd 和 Milvus 仍通过 digest-pinned image input 提供，因为其 rootfs、动态库、启动和持久化耦合尚未完成逐组件 extraction/cold-start proof。这是记录在 `hfs-dev.toml` 的限期 hybrid deviation，而不是 artifact 车道已完成的声明。解除前必须由 owner 批准并完成动态库、license、health、cold-start、持久化和隔离恢复验证。
 
-## Upstream Tracking Snapshot
-
-2026-07-15 live readback：
-
-- 最新正式 release 仍是 `v0.5.1`；Docker Hub 的 `latest` 与 `0.5.1` 对 server/web 分别指向相同 manifest digest。
-- upstream `main@22275b1c2661d35344a7493cffe401e8cc61cf8e` 比 `v0.5.1` 多 8 个未发布 commit，但没有对应的新 server/web image pair，不能把 `COZE_GIT_REF` 单独切到 `main` 后声称完成适配。
-- wrapper 已等价吸收可由配置层完成的 `8de249d`：生成环境显式设置 `CODE_RUNNER_TYPE=sandbox`。
-- wrapper 暂时阻断 `/admin` 和 `/api/admin/*`，缓解 `5aaf6d5` 修复前的 upstream admin fail-open。SQL injection、OAuth nonce/phishing 和 workflow resume 修复属于 upstream binary 变化，必须等待匹配 release 或改用经过审计的自建 server/web 镜像。
-- MySQL 初始化记录 pinned HCL 的 SHA-256。旧 `.coze_bootstrap_done` 数据目录或 schema 指纹变化时会启动临时 MariaDB 并执行 `atlas schema apply`；Atlas 失败会阻止启动且不会推进 marker，避免把换 binary 误报为完成持久化数据库 migration。
-
-## Local-Only Materials
-
-`local/` 只作参考材料或本地临时记录，不进入部署包、公开文档真相源或提交边界。`.env.local` 是本机私有 env ledger，只能记录本地同步状态和私有值；公开文档只写 key、分类、默认值、占位符和操作规则。
+MariaDB、Redis、NATS、MinIO、etcd、Milvus、Elasticsearch 的服务、路径、端口、auth、Nginx routing、`/_ops/*` 只读边界和 default-off `/_admin/*` 语义不因 artifact bootstrap 改变。`/data/coze` 继续是持久化根；`/run/coze`、Nginx temporary files、ES 和 Milvus local runtime state 继续留在容器本地。
 
 ## Validation
 
-默认本地验证：
-
 ```bash
-./scripts/static-check.sh
+./scripts/validate-hfs-contract.sh
 ./scripts/check-syntax.sh
+python3 -m unittest discover -s hfs/tests -p 'test_*.py'
+./scripts/static-check.sh
+python3 /Users/sky/Github/SKY-Prompt/hfs-dev/scripts/check_hfs_alignment.py .
+git diff --check
 ```
 
-如果本地 runtime 已启动，可额外跑 `./scripts/admin-smoke.sh http://localhost:7860` 验证 admin 默认关闭或受控开启状态。
-
-线上 Space 验证：
-
-```bash
-./scripts/hf-space-smoke.sh https://blueskyxn-coze-all-in-one-hfs.hf.space
-```
-
-如果本机没有 Docker，不要把本地 build/run 写成已验证；以静态检查、HF build logs、HF runtime logs 和 live endpoint 回读分层说明。
+Docker build/run、artifact build/publish/promote、Space Settings sync、remote smoke、login/business flow、backup 和隔离 restore 都是单独的 owner/runtime gates；本地静态检查不能替代它们。
