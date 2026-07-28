@@ -166,12 +166,11 @@ RUN set -eux; \
       /opt/coze-hfs/conf \
       /opt/coze-hfs/elasticsearch/es_index_schema \
       /opt/coze/bootstrap \
-      /opt/coze-web \
       /run/nginx \
       /var/lib/milvus \
       /var/lib/nginx/tmp \
       /var/log/nginx; \
-    chown -R user:user /data /opt/coze-hfs /opt/coze /opt/coze-web /run/nginx /var/lib/nginx /var/log/nginx /home/user; \
+    chown -R user:user /data /opt/coze-hfs /opt/coze /run/nginx /var/lib/nginx /var/log/nginx /home/user; \
     chown -R cozeadmin:cozeadmin /data/coze/admin
 
 # Server and web payloads are downloaded by bootstrap_runtime.py from one
@@ -187,7 +186,7 @@ RUN set -eux; \
     curl -fsSL "https://raw.githubusercontent.com/coze-dev/coze-studio/${COZE_SOURCE_COMMIT}/docker/volumes/elasticsearch/es_index_schema/project_draft.index-template.json" -o /opt/coze-hfs/elasticsearch/es_index_schema/project_draft.index-template.json; \
     sed -i 's/utf8mb4_0900_ai_ci/utf8mb4_unicode_ci/g' /opt/coze/bootstrap/schema.sql /opt/coze/bootstrap/opencoze_latest_schema.hcl; \
     cp /opt/coze-hfs/elasticsearch/elasticsearch.yml /opt/bitnami/elasticsearch/config/my_elasticsearch.yml; \
-    chown -R user:user /app /opt/coze /opt/coze-web /opt/coze-hfs
+    chown -R user:user /app /opt/coze /opt/coze-hfs
 
 COPY hfs/bin/ /opt/coze-hfs/bin/
 COPY hfs/conf/ /opt/coze-hfs/conf/
@@ -200,7 +199,7 @@ RUN chmod +x /opt/coze-hfs/bin/*.sh /opt/coze-hfs/bin/bootstrap_runtime.py \
     && test -x /usr/bin/tini \
     && test -x /usr/bin/python3 \
     && test -x /usr/sbin/nats-server \
-    && chown -R user:user /opt/coze-hfs /app /opt/coze /opt/coze-web /data/coze \
+    && chown -R user:user /opt/coze-hfs /app /opt/coze /data/coze \
     && chown -R cozeadmin:cozeadmin /data/coze/admin
 
 WORKDIR /opt/coze-hfs

@@ -160,6 +160,9 @@ require_grep '^      /app \\$' Dockerfile "Dockerfile must create the HF app fil
 if grep -Eq '^      /app/runtime (\\|$)' Dockerfile; then
   fail "Dockerfile must not pre-create the replaceable /app/runtime lower-layer directory"
 fi
+if grep -Eq '^      /opt/coze-web (\\|$)' Dockerfile; then
+  fail "Dockerfile must not pre-create the replaceable /opt/coze-web lower-layer directory"
+fi
 require_grep '^WORKDIR /opt/coze-hfs$' Dockerfile "Dockerfile must not start bootstrap inside the replaceable /app destination"
 require_grep '"destination": Path\("/app/runtime"\)' hfs/bin/bootstrap_runtime.py "server artifacts must install inside the HF /app filesystem"
 
