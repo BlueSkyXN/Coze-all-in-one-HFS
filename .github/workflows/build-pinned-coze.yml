@@ -265,7 +265,7 @@ jobs:
           python-version: "3.11"
       - name: Install pinned Hugging Face CLI
         run: |
-          python3 -m pip install --disable-pip-version-check "huggingface_hub==1.5.0"
+          python3 -m pip install --disable-pip-version-check "huggingface_hub==1.5.0" "click==8.3.1"
           python3 -m huggingface_hub.cli.hf version
       - name: Publish artifact-first, read back, then write edge manifest
         shell: bash
@@ -333,7 +333,7 @@ jobs:
           python-version: "3.11"
       - name: Install pinned Hugging Face CLI
         run: |
-          python3 -m pip install --disable-pip-version-check "huggingface_hub==1.5.0"
+          python3 -m pip install --disable-pip-version-check "huggingface_hub==1.5.0" "click==8.3.1"
           python3 -m huggingface_hub.cli.hf version
       - name: Download and verify the archived release
         shell: bash
