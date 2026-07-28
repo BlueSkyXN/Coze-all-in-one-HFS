@@ -189,6 +189,32 @@ class AdminServiceTests(unittest.TestCase):
         self.assertEqual(response.status, 200)
         self.assertTrue(status_body["ok"])
 
+    def test_explicit_admin_header_takes_precedence_over_gateway_bearer(self):
+        os.environ["ADMIN_ENABLED"] = "true"
+        server = ThreadingHTTPServer(("127.0.0.1", 0), QuietHandler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        self.addCleanup(server.server_close)
+        self.addCleanup(thread.join, 2)
+        self.addCleanup(server.shutdown)
+        host, port = server.server_address
+
+        conn = http.client.HTTPConnection(host, port, timeout=5)
+        conn.request(
+            "GET",
+            "/_admin/api/status",
+            headers={
+                "X-Admin-Token": "test-admin-token-that-is-long-enough",
+                "Authorization": "Bearer hf-gateway-token",
+            },
+        )
+        response = conn.getresponse()
+        body = json.loads(response.read().decode("utf-8"))
+        conn.close()
+
+        self.assertEqual(response.status, 200)
+        self.assertTrue(body["ok"])
+
 
 if __name__ == "__main__":
     unittest.main()

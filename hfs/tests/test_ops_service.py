@@ -227,6 +227,30 @@ class OpsServiceTests(unittest.TestCase):
         self.assertEqual(response.status, 401)
         self.assertEqual(body["status"], "unauthorized")
 
+    def test_explicit_ops_header_takes_precedence_over_gateway_bearer(self):
+        token = "test-ops-token-that-is-long-enough"
+        os.environ["OPS_TOKEN"] = token
+        server = ThreadingHTTPServer(("127.0.0.1", 0), QuietHandler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        self.addCleanup(server.server_close)
+        self.addCleanup(thread.join, 2)
+        self.addCleanup(server.shutdown)
+        host, port = server.server_address
+
+        conn = http.client.HTTPConnection(host, port, timeout=5)
+        conn.request(
+            "GET",
+            "/_ops/version",
+            headers={"X-Ops-Token": token, "Authorization": "Bearer hf-gateway-token"},
+        )
+        response = conn.getresponse()
+        body = json.loads(response.read().decode("utf-8"))
+        conn.close()
+
+        self.assertEqual(response.status, 200)
+        self.assertEqual(body["coze"]["runtime_provenance"]["source_ref"], "b" * 40)
+
     def test_ops_dashboard_rejects_short_token_configuration(self):
         os.environ["OPS_TOKEN"] = "too-short"
 

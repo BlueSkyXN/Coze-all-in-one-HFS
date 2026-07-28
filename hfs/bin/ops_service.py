@@ -724,9 +724,10 @@ class Handler(BaseHTTPRequestHandler):
         if ops_lock_reason():
             return False
         header_token = self.headers.get("X-Ops-Token", "")
-        auth = self.headers.get("Authorization", "")
-        if auth.lower().startswith("bearer "):
-            header_token = auth.split(None, 1)[1]
+        if not header_token:
+            auth = self.headers.get("Authorization", "")
+            if auth.lower().startswith("bearer "):
+                header_token = auth.split(None, 1)[1]
         if header_token and hmac.compare_digest(header_token, token):
             return True
         return False
