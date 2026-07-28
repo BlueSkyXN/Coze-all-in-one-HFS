@@ -282,7 +282,10 @@ class BootstrapRuntimeTests(unittest.TestCase):
                 return real_replace(source, destination)
 
             with mock.patch.object(bootstrap.os, "replace", side_effect=fail_web_stage):
-                with self.assertRaises(bootstrap.BootstrapError):
+                with self.assertRaisesRegex(
+                    bootstrap.BootstrapError,
+                    r"component=web, step=install-staged, errno=unknown",
+                ):
                     bootstrap.commit_prepared_components(
                         [
                             ("server", server_parent, server_stage, server_destination),
@@ -292,6 +295,20 @@ class BootstrapRuntimeTests(unittest.TestCase):
 
             self.assertEqual((server_destination / "old").read_text(encoding="utf-8"), "server")
             self.assertEqual((web_destination / "old").read_text(encoding="utf-8"), "web")
+
+    def test_main_leaves_runtime_destination_before_downloading(self):
+        with mock.patch.object(bootstrap.os, "chdir") as chdir, mock.patch.object(
+            bootstrap, "download", side_effect=bootstrap.BootstrapError("stop after cwd check")
+        ):
+            with mock.patch.dict(
+                os.environ,
+                {"COZE_RUNTIME_MANIFEST_URI": "https://huggingface.co/runtime/manifest.json"},
+                clear=True,
+            ):
+                with self.assertRaisesRegex(bootstrap.BootstrapError, "stop after cwd check"):
+                    bootstrap.main()
+
+        chdir.assert_called_once_with("/")
 
     def test_provenance_excludes_source_url_and_persists_checksums(self):
         with tempfile.TemporaryDirectory() as tmpdir:

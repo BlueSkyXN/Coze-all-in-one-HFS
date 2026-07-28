@@ -279,13 +279,18 @@ def prepare_component(archive: Path, component: str, destination: Path) -> tuple
 def commit_prepared_components(prepared: list[tuple[str, Path, Path, Path]]) -> None:
     """Replace the pair only after both bundles are ready, restoring on failure."""
     moved: list[tuple[Path, Path | None]] = []
+    current_component = "unknown"
+    current_step = "prepare"
     try:
         for component, _stage_parent, stage, destination in prepared:
+            current_component = component
             backup: Path | None = None
             if destination.exists() or destination.is_symlink():
                 backup = destination.parent / f".coze-{component}-previous-{uuid.uuid4().hex}"
+                current_step = "backup-existing"
                 os.replace(destination, backup)
             moved.append((destination, backup))
+            current_step = "install-staged"
             os.replace(stage, destination)
     except OSError as exc:
         for destination, backup in reversed(moved):
@@ -295,7 +300,11 @@ def commit_prepared_components(prepared: list[tuple[str, Path, Path, Path]]) -> 
                     os.replace(backup, destination)
             except OSError:
                 pass
-        raise BootstrapError("runtime artifact pair could not be atomically installed") from exc
+        errno = exc.errno if exc.errno is not None else "unknown"
+        raise BootstrapError(
+            "runtime artifact pair could not be atomically installed "
+            f"(component={current_component}, step={current_step}, errno={errno})"
+        ) from exc
     try:
         for _destination, backup in moved:
             if backup is not None:
@@ -385,6 +394,14 @@ def main() -> int:
     if app_dir != COMPONENTS["server"]["destination"] or web_dir != COMPONENTS["web"]["destination"]:
         raise BootstrapError("runtime destinations must remain /app and /opt/coze-web")
     run_dir = Path(os.environ.get("RUN_DIR", "/run/coze"))
+
+    # Docker previously started in /app, which is one of the directories this
+    # process replaces. Leave every runtime destination before staging so the
+    # install does not depend on filesystem-specific rename-of-cwd behavior.
+    try:
+        os.chdir("/")
+    except OSError as exc:
+        raise BootstrapError("unable to leave the runtime destination before installation") from exc
 
     with tempfile.TemporaryDirectory(prefix="coze-runtime-", dir="/tmp") as temporary:
         workdir = Path(temporary)

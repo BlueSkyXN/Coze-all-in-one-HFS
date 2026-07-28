@@ -203,7 +203,7 @@ RUN chmod +x /opt/coze-hfs/bin/*.sh /opt/coze-hfs/bin/bootstrap_runtime.py \
     && chown -R user:user /opt/coze-hfs /app /opt/coze /opt/coze-web /data/coze \
     && chown -R cozeadmin:cozeadmin /data/coze/admin
 
-WORKDIR /app
+WORKDIR /opt/coze-hfs
 
 EXPOSE 7860
 
