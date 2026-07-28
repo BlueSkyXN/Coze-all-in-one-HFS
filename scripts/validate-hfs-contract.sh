@@ -73,8 +73,8 @@ for path in "${required_files[@]}"; do
   require_file "$path"
 done
 
-require_grep 'tar --dereference --sort=name' .github/workflows/build-pinned-coze.yml \
-  'runtime artifact producer must dereference image symlinks before safe-tar validation'
+require_grep 'tar --dereference --hard-dereference --sort=name' .github/workflows/build-pinned-coze.yml \
+  'runtime artifact producer must flatten image links before safe-tar validation'
 
 python3 - "$repo_root" <<'PY'
 from __future__ import annotations
