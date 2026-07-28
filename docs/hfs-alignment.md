@@ -19,7 +19,7 @@
 
 Coze server 与 web 是不可变 runtime artifacts。启动时 `bootstrap_runtime.py`：
 
-1. 只读取一次 `COZE_RUNTIME_MANIFEST_URI` 指向的直接 HTTPS `manifest.json`；URL 不允许 query、fragment、嵌入凭据或 redirect。
+1. 只读取一次 `COZE_RUNTIME_MANIFEST_URI` 指向的 Hugging Face HTTPS `manifest.json`；URL 不允许 query、fragment 或嵌入凭据。仅允许跳转到 `cas-bridge.xethub.hf.co`，且跳转请求不携带 Bearer token。
 2. 只接受 `schema_version=1`、完整 40 位 Git commit、按该 commit 命名的 `BUILD_SOURCE-<commit>.json` checksum，以及恰好一份 server 和 web artifact。
 3. 从 manifest 同目录下载按 commit 命名的 `BUILD_SOURCE-<commit>.json`、server 和 web；分别校验 SHA-256、size、完整 component provenance、tar path/link/device/privileged-mode safety、解包上限与必需入口文件。两个 payload 先共同完成 staging 与动态库验证，再安装；任一替换失败会恢复两个先前目录。
 4. 仅将成功校验的 payload 原子安装至 `/app` 与 `/opt/coze-web`。下载和解包临时文件只在 `/tmp`，不会写入 `/data/coze`。

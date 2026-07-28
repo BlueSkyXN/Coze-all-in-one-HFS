@@ -50,11 +50,18 @@ class BootstrapError(RuntimeError):
     """Safe bootstrap failure that never exposes credential values."""
 
 
-class NoRedirect(urllib.request.HTTPRedirectHandler):
-    """Do not forward an optional bearer token to a redirect target."""
+class SafeArtifactRedirect(urllib.request.HTTPRedirectHandler):
+    """Follow only the HF Xet download redirect without forwarding credentials."""
 
-    def redirect_request(self, req: Any, fp: Any, code: int, msg: str, headers: Any, newurl: str) -> None:
-        raise urllib.error.HTTPError(req.full_url, code, "redirects are not accepted", headers, fp)
+    def redirect_request(self, req: Any, fp: Any, code: int, msg: str, headers: Any, newurl: str) -> Any:
+        target = urllib.parse.urlsplit(newurl)
+        if target.scheme != "https" or target.hostname != "cas-bridge.xethub.hf.co":
+            raise urllib.error.HTTPError(req.full_url, code, "artifact redirect target is not allowed", headers, fp)
+        return urllib.request.Request(
+            newurl,
+            headers={"User-Agent": "coze-hfs-runtime-bootstrap/1"},
+            method=req.get_method(),
+        )
 
 
 def require_https_url(value: str, field: str) -> urllib.parse.SplitResult:
@@ -73,12 +80,14 @@ def manifest_artifact_url(manifest_url: str, artifact: str) -> str:
 
 
 def download(url: str, destination: Path, token: str) -> None:
-    require_https_url(url, "runtime artifact URL")
+    parsed = require_https_url(url, "runtime artifact URL")
+    if token and parsed.hostname != "huggingface.co":
+        raise BootstrapError("bearer-authenticated runtime downloads must use huggingface.co")
     headers = {"User-Agent": "coze-hfs-runtime-bootstrap/1"}
     if token:
         headers["Authorization"] = f"Bearer {token}"
     request = urllib.request.Request(url, headers=headers)
-    opener = urllib.request.build_opener(NoRedirect())
+    opener = urllib.request.build_opener(SafeArtifactRedirect())
     try:
         with opener.open(request, timeout=60) as response, destination.open("wb") as output:
             content_length = response.headers.get("Content-Length")

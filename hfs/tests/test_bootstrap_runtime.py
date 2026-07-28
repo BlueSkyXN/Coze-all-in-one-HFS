@@ -86,6 +86,43 @@ def write_archive(path: Path, members: dict[str, tuple[bytes, int]]) -> None:
 
 
 class BootstrapRuntimeTests(unittest.TestCase):
+    def test_hf_xet_redirect_strips_bearer_and_rejects_other_targets(self):
+        handler = bootstrap.SafeArtifactRedirect()
+        request = bootstrap.urllib.request.Request(
+            "https://huggingface.co/buckets/BlueSkyXN/hfs-dist/resolve/coze/manifest.json",
+            headers={"Authorization": "Bearer test-token", "User-Agent": "test"},
+        )
+        redirected = handler.redirect_request(
+            request,
+            None,
+            302,
+            "Found",
+            {},
+            "https://cas-bridge.xethub.hf.co/xet-object?signature=test",
+        )
+        self.assertIsNotNone(redirected)
+        self.assertEqual(redirected.get_header("Authorization"), None)
+        self.assertEqual(redirected.get_header("User-agent"), "coze-hfs-runtime-bootstrap/1")
+
+        with self.assertRaises(bootstrap.urllib.error.HTTPError):
+            handler.redirect_request(
+                request,
+                None,
+                302,
+                "Found",
+                {},
+                "https://example.com/exfiltrate",
+            )
+
+    def test_bearer_downloads_are_restricted_to_huggingface(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            destination = Path(tmpdir) / "payload"
+            with self.assertRaisesRegex(
+                bootstrap.BootstrapError,
+                "bearer-authenticated runtime downloads must use huggingface.co",
+            ):
+                bootstrap.download("https://example.com/artifact", destination, "test-token")
+
     def test_manifest_requires_two_checksummed_commit_named_artifacts(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)

@@ -11,11 +11,11 @@ git ls-remote https://huggingface.co/spaces/BlueSkyXN/Coze-all-in-one-HFS refs/h
 
 ## Runtime manifest 或 artifact bootstrap 失败
 
-`COZE_RUNTIME_MANIFEST_URI` 必须是无 query、fragment、嵌入凭据或 redirect 的直接 HTTPS URL。启动只接受包含完整 40 位 commit、按同一 commit 命名的 `BUILD_SOURCE-<commit>.json` SHA-256、server/web artifact SHA-256 与 size 的 manifest。检查顺序：
+`COZE_RUNTIME_MANIFEST_URI` 必须是无 query、fragment、嵌入凭据的 `https://huggingface.co/...` URL。启动只允许 Hugging Face 的 `cas-bridge.xethub.hf.co` Xet 下载跳转，并在跳转前移除 Bearer token；其他跳转一律拒绝。manifest 仍须包含完整 40 位 commit、按同一 commit 命名的 `BUILD_SOURCE-<commit>.json` SHA-256、server/web artifact SHA-256 与 size。检查顺序：
 
 1. 用 `scripts/verify-runtime-artifacts.py --manifest <manifest> --artifacts-dir <dir>` 在发布前复验 Release 文件。
 2. 确认 manifest、commit-named `BUILD_SOURCE-<commit>.json`、server 和 web 已 artifact-first 上传并逐字节 readback；manifest 必须最后写入。
-3. 若下载面私有，确认 `COZE_RUNTIME_DOWNLOAD_TOKEN` 仅作为 Space Secret 存在，并且 endpoint 支持 header bearer auth；不要把 token 放 URL。
+3. 若下载面私有，确认 `COZE_RUNTIME_DOWNLOAD_TOKEN` 仅作为 Space Secret 存在；Bearer 只发送给 `huggingface.co`，不会转发到 Xet 下载域，也不要把 token 放 URL。
 4. 从受 `OPS_TOKEN` 保护的 `/_ops/version` 回读 source commit、manifest checksum 和 artifact checksums，不要从日志或 URL 查 token。
 
 不允许通过旧 `/app`、缓存、目录扫描、`latest` 或备用 URI 让容器继续启动。`COZE_SOURCE_COMMIT` 同时绑定 schema、Atlas HCL 与 server/web runtime artifact；`COZE_RELEASE_TAG=v0.5.1` 仅是描述性 label，不能替代 commit provenance。
