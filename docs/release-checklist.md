@@ -19,17 +19,19 @@ git diff --check
 
 默认会验证 `ADMIN_ENABLED=false` 时 `/_admin/` 和 `/_admin/api/status` 返回 404；显式开启 admin 时必须提供 `ADMIN_TOKEN`。
 
-## 2. Release Pin Review
+## 2. Hybrid Artifact Review
 
-检查 `hfs-dev.toml` 的 `[[release_pins]]` 与 `Dockerfile` 一致：
+先检查 `hfs-dev.toml` 是最小 HFS v2 registry：`standard="2.0"`、Pattern A `port`、artifact registry lane、Setting key names 和已登记 hybrid deviation。不要把 Docker ARG、artifact checksum 或 runtime invariant 复制回 registry。
 
-- `COZE_SERVER_TAG`、`COZE_WEB_TAG`、`COZE_GIT_REF` 指向同一 Coze Studio release；Coze server/web 默认值必须保持 `tag@sha256:...`。
-- `ELASTICSEARCH_IMAGE`、`ETCD_IMAGE`、`MILVUS_IMAGE` 必须保持 `tag@sha256:...` manifest digest。
-- Deno、Atlas CLI、MinIO server、MinIO client 必须保持固定版本，并同时提供 amd64/arm64 checksum：`DENO_SHA256_*`、`ATLAS_SHA256_*`、`MINIO_SHA256_*`、`MC_SHA256_*`。
+每次 server/web artifact 发布必须满足：
 
-任何新增下载型 artifact 都必须进入 `[[release_pins]]` 并在安装前校验；不允许用空 checksum 发布。
+- workflow 输入为完整 40 位 `upstream_ref`；构建 checkout、commit-named `BUILD_SOURCE-<commit>.json`、manifest `source_ref` 和 artifact 文件名必须一致。
+- commit-named `BUILD_SOURCE-<commit>.json`、server、web 都有 SHA-256；manifest 还记录 server/web `size_bytes`。
+- 用 `scripts/verify-runtime-artifacts.py` 在发布前验证 manifest、checksum、tar safety 和入口文件。
+- 只允许 artifact-first → object readback → manifest-last；Space runtime 不扫描 slot、旧 `/app`、cache 或备用 URI。
+- `release` 把已验证集合写入 GitHub Release 历史；`promote-release` 必须从该 Release 重下载、复验后再写 `release/`。
 
-同时执行 upstream readback：确认最新正式 release、Docker Hub server/web tag digest、`v<current>...main` commit 差异。没有匹配 server/web image pair 时，不允许只把 `COZE_GIT_REF` 切到 upstream `main`。
+`COZE_SOURCE_COMMIT` 是 server/web artifact、schema 与 Atlas HCL 的唯一来源；`COZE_RELEASE_TAG` 只作 release label。Elasticsearch、etcd、Milvus 仍必须保持 Dockerfile digest；没有组件 extraction、动态库、cold-start 和持久化证据时，不能删去 deviation 或声称已 artifact 化。
 
 ## 3. Env Ledger
 
@@ -43,23 +45,18 @@ git diff --check
 
 如果 `/data/coze` 已挂载 read-write HF bucket volume，同时设置 `PERSISTENCE_REQUIRED=true`。此后 canonical health 会把 mount 丢失视为 503，避免在 overlay filesystem 上静默启动并误报持久化正常。线上 smoke 使用 `SMOKE_PERSISTENCE_REQUIRED=true` 回读该门禁。
 
-## 4. Remote Sync
+## 4. Controlled Remote Publication
 
-确认 GitHub 和 Hugging Face remote 分层：
+本轮只允许 GitHub Actions 的手动 workflow 执行 artifact publication；选择 `publish-edge`、`release` 或 `promote-release` 时必须填写 `confirmed=true`，并先取得 release/data owner 对 Space、`hfs-dist`、Settings 与维护窗口的批准。不得用 credential-bearing Git URL、whole-repo force-push、`hf upload --delete` 或网页临时修改替代流程。
 
-```bash
-git remote -v
-git status --short --branch --untracked-files=all
-git rev-parse HEAD origin/main
-```
+发布后至少 read back：
 
-需要部署到 HF 时，再显式推送 Space remote：
+- artifact、commit-named `BUILD_SOURCE-<commit>.json` 与最后写入的 manifest 字节一致；
+- GitHub Release tag、target commit 与 assets；
+- Space wrapper revision、runtime provenance 和 Setting key presence；
+- Space runtime stage / SHA、`/nginx-health`、`/_ops/healthz`、`/_ops/version`、`/sign` 与适用的 auth/business smoke。
 
-```bash
-git push hf main
-```
-
-GitHub push、HF repo commit、HF runtime takeover 是三层验证，不要只看其中一层就下结论。
+GitHub commit、artifact publication、Space wrapper update 和运行接管是独立事实；任何单项成功均不代表其余层已完成。
 
 ## 5. Live Runtime Gate
 

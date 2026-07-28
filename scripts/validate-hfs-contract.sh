@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# shellcheck disable=SC2016
+# Validate the repository-local HFS v2 hybrid contract without Docker or network.
 set -euo pipefail
 
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
@@ -14,25 +14,19 @@ fail() {
 
 require_file() {
   local path="$1"
-  if [ ! -f "$path" ]; then
-    fail "missing required file: $path"
-  fi
+  [ -f "$path" ] || fail "missing required file: $path"
 }
 
 require_grep() {
   local pattern="$1"
   local path="$2"
   local message="$3"
-  if ! grep -Eq "$pattern" "$path"; then
-    fail "$message"
-  fi
+  grep -Eq "$pattern" "$path" || fail "$message"
 }
 
 require_ignore_pattern() {
   local pattern="$1"
-  if ! grep -qxF "$pattern" .dockerignore; then
-    fail ".dockerignore must include: $pattern"
-  fi
+  grep -qxF "$pattern" .dockerignore || fail ".dockerignore must include: $pattern"
 }
 
 frontmatter_value() {
@@ -54,25 +48,33 @@ required_files=(
   README.md
   Dockerfile
   hfs-dev.toml
+  hfs-dev.candidate.toml
+  .env.example
   AGENTS.md
   hfs/AGENTS.md
   hfs/bin/entrypoint.sh
+  hfs/bin/bootstrap_runtime.py
   hfs/bin/healthcheck.sh
   hfs/bin/ops_service.py
   hfs/bin/admin_service.py
   hfs/bin/run-admin-service.sh
   hfs/conf/nginx.conf
   hfs/conf/supervisord.conf
+  hfs/tests/test_bootstrap_runtime.py
+  scripts/verify-runtime-artifacts.py
   scripts/admin-smoke.sh
   scripts/hf-space-smoke.sh
   scripts/static-check.sh
+  .github/workflows/build-pinned-coze.yml
   docs/hfs-alignment.md
   docs/release-checklist.md
 )
-
 for path in "${required_files[@]}"; do
   require_file "$path"
 done
+
+require_grep 'tar --dereference --hard-dereference --sort=name' .github/workflows/build-pinned-coze.yml \
+  'runtime artifact producer must flatten image links before safe-tar validation'
 
 python3 - "$repo_root" <<'PY'
 from __future__ import annotations
@@ -83,144 +85,46 @@ from pathlib import Path
 
 root = Path(sys.argv[1])
 manifest = tomllib.loads((root / "hfs-dev.toml").read_text(encoding="utf-8"))
-
+candidate = tomllib.loads((root / "hfs-dev.candidate.toml").read_text(encoding="utf-8"))
 expected = {
-    "schema_version": 2,
-    "standard": "hfs-dev",
-    "pattern": "A",
-    "runtime_mode": "image-assembly",
-    "space_root_mode": "repo-root",
-    "hfs_dir": ".",
-    "public_port": 7860,
-    "canonical_health_endpoint": "/_ops/healthz",
-    "release_pin_required": True,
+    "standard": "2.0",
+    "project": "coze-all-in-one-hfs",
+    "space": "BlueSkyXN/Coze-all-in-one-HFS",
+    "sovereignty": "port",
+    "lane": "artifact",
+    "version_source": "commit",
+    "dist_bucket": "hfs-dist",
 }
-
-expected_pins = {
-    "COZE_SERVER_TAG": {
-        "type": "image_tag",
-        "source": "Dockerfile ARG",
-        "required_for_release": True,
-        "dev_mutable_default_allowed": False,
-        "release_requires_digest": True,
-    },
-    "COZE_WEB_TAG": {
-        "type": "image_tag",
-        "source": "Dockerfile ARG",
-        "required_for_release": True,
-        "dev_mutable_default_allowed": False,
-        "release_requires_digest": True,
-    },
-    "COZE_GIT_REF": {
-        "type": "git_ref",
-        "source": "Dockerfile ARG",
-        "required_for_release": True,
-        "dev_mutable_default_allowed": False,
-        "release_requires_commit_or_tag": True,
-    },
-    "ELASTICSEARCH_IMAGE": {
-        "type": "image_ref",
-        "source": "Dockerfile ARG",
-        "required_for_release": True,
-        "dev_mutable_default_allowed": False,
-        "release_requires_digest": True,
-    },
-    "ETCD_IMAGE": {
-        "type": "image_ref",
-        "source": "Dockerfile ARG",
-        "required_for_release": True,
-        "dev_mutable_default_allowed": False,
-        "release_requires_digest": True,
-    },
-    "MILVUS_IMAGE": {
-        "type": "image_ref",
-        "source": "Dockerfile ARG",
-        "required_for_release": True,
-        "dev_mutable_default_allowed": False,
-        "release_requires_digest": True,
-    },
-    "DENO_VERSION": {
-        "type": "artifact_version",
-        "source": "Dockerfile ARG",
-        "required_for_release": True,
-        "dev_mutable_default_allowed": False,
-        "release_requires_checksum": True,
-    },
-    "ATLAS_VERSION": {
-        "type": "artifact_version",
-        "source": "Dockerfile ARG",
-        "required_for_release": True,
-        "dev_mutable_default_allowed": False,
-        "release_requires_checksum": True,
-    },
-    "MINIO_VERSION": {
-        "type": "artifact_version",
-        "source": "Dockerfile ARG",
-        "required_for_release": True,
-        "dev_mutable_default_allowed": False,
-        "release_requires_checksum": True,
-    },
-    "MC_VERSION": {
-        "type": "artifact_version",
-        "source": "Dockerfile ARG",
-        "required_for_release": True,
-        "dev_mutable_default_allowed": False,
-        "release_requires_checksum": True,
-    },
-}
-
+required_secrets = {"COZE_RUNTIME_DOWNLOAD_TOKEN", "OPS_TOKEN", "ADMIN_TOKEN"}
+required_variables = {"COZE_RUNTIME_MANIFEST_URI", "PERSISTENCE_REQUIRED", "CODE_RUNNER_TYPE", "MODEL_PROTOCOL_0", "S3_ENDPOINT"}
 failures: list[str] = []
+if candidate.get("space") != "BlueSkyXN/Coze-all-in-one-HFS-v2-candidate":
+    failures.append("candidate manifest must target BlueSkyXN/Coze-all-in-one-HFS-v2-candidate")
+for key in ("standard", "project", "sovereignty", "lane", "version_source", "local_only", "secrets", "variables", "dist_bucket", "seed_file", "other_objects", "deviations"):
+    if candidate.get(key) != manifest.get(key):
+        failures.append(f"candidate manifest {key} must match production manifest")
 for key, value in expected.items():
     if manifest.get(key) != value:
         failures.append(f"hfs-dev.toml {key} must be {value!r}, got {manifest.get(key)!r}")
-
-if "release_pin_surfaces" in manifest:
-    failures.append("hfs-dev.toml v2 must use structured [[release_pins]], not release_pin_surfaces")
-
-release_pins = manifest.get("release_pins")
-if not isinstance(release_pins, list) or not release_pins:
-    failures.append("hfs-dev.toml release_pins must be a non-empty structured array")
-else:
-    pins_by_name: dict[str, dict[str, object]] = {}
-    for index, pin in enumerate(release_pins, start=1):
-        if not isinstance(pin, dict):
-            failures.append(f"hfs-dev.toml release_pins[{index}] must be a table")
-            continue
-        name = pin.get("name")
-        if not isinstance(name, str) or not name:
-            failures.append(f"hfs-dev.toml release_pins[{index}] must set name")
-            continue
-        if name in pins_by_name:
-            failures.append(f"hfs-dev.toml release_pins duplicate name: {name}")
-        pins_by_name[name] = pin
-
-    missing = sorted(set(expected_pins) - set(pins_by_name))
-    if missing:
-        failures.append("hfs-dev.toml release_pins missing: " + ", ".join(missing))
-    unexpected = sorted(set(pins_by_name) - set(expected_pins))
-    if unexpected:
-        failures.append("hfs-dev.toml release_pins unexpected: " + ", ".join(unexpected))
-
-    for name, expected_pin in expected_pins.items():
-        pin = pins_by_name.get(name)
-        if not pin:
-            continue
-        if not isinstance(pin.get("current_dev_default"), str) or not pin.get("current_dev_default"):
-            failures.append(f"hfs-dev.toml release_pins {name} must set current_dev_default")
-        for key, value in expected_pin.items():
-            if pin.get(key) != value:
-                failures.append(
-                    f"hfs-dev.toml release_pins {name}.{key} must be {value!r}, got {pin.get(key)!r}"
-                )
-
-required_files = manifest.get("required_files")
-if not isinstance(required_files, list) or not required_files:
-    failures.append("hfs-dev.toml required_files must be a non-empty list")
-else:
-    for rel_path in required_files:
-        if not isinstance(rel_path, str) or not (root / rel_path).exists():
-            failures.append(f"hfs-dev.toml required file is missing: {rel_path!r}")
-
+for legacy in ("schema_version", "pattern", "runtime_mode", "release_pins", "required_files"):
+    if legacy in manifest:
+        failures.append(f"hfs-dev.toml must not keep legacy field: {legacy}")
+for field in ("local_only", "secrets", "variables", "deviations"):
+    value = manifest.get(field)
+    if not isinstance(value, list) or not value or not all(isinstance(item, str) and item for item in value):
+        failures.append(f"hfs-dev.toml {field} must be a non-empty string array")
+secrets = set(manifest.get("secrets", []))
+variables = set(manifest.get("variables", []))
+if not required_secrets <= secrets:
+    failures.append("hfs-dev.toml secrets must register runtime download and ops/admin token names")
+if not required_variables <= variables:
+    failures.append("hfs-dev.toml variables must register runtime manifest and policy names")
+if secrets & variables:
+    failures.append("hfs-dev.toml secrets and variables must not overlap")
+if not any(entry.startswith("hybrid-wrapper =") for entry in manifest.get("deviations", [])):
+    failures.append("hfs-dev.toml must document the hybrid wrapper deviation")
+if not any(entry.startswith("business-image =") for entry in manifest.get("deviations", [])):
+    failures.append("hfs-dev.toml must document retained infrastructure images")
 if failures:
     for failure in failures:
         print(f"FAIL hfs-contract: {failure}", file=sys.stderr)
@@ -229,203 +133,90 @@ PY
 
 sdk=$(frontmatter_value sdk)
 app_port=$(frontmatter_value app_port)
-if [ "$sdk" != "docker" ]; then
-  fail "README.md frontmatter must set sdk: docker"
-fi
-if [ -z "$app_port" ]; then
-  fail "README.md frontmatter must set app_port"
-fi
+[ "$sdk" = "docker" ] || fail "README.md frontmatter must set sdk: docker"
+[ "$app_port" = "7860" ] || fail "README.md frontmatter must set app_port: 7860"
+[ "$(awk 'toupper($1) == "EXPOSE" { print $2; exit }' Dockerfile)" = "$app_port" ] || fail "Dockerfile EXPOSE must match README app_port"
+[ "$(awk '$1 == "listen" { value=$2; gsub(";", "", value); split(value, parts, ":"); print parts[length(parts)]; exit }' hfs/conf/nginx.conf)" = "$app_port" ] || fail "nginx listen must match README app_port"
 
-docker_expose=$(awk 'toupper($1) == "EXPOSE" { print $2; exit }' Dockerfile)
-nginx_listen=$(awk '
-  $1 == "listen" {
-    value = $2
-    gsub(";", "", value)
-    split(value, parts, ":")
-    print parts[length(parts)]
-    exit
-  }
-' hfs/conf/nginx.conf)
-
-if [ -n "$app_port" ] && [ "$docker_expose" != "$app_port" ]; then
-  fail "Dockerfile EXPOSE ($docker_expose) must match README.md app_port ($app_port)"
+if grep -Eq '^FROM cozedev/coze-studio-(server|web):' Dockerfile || grep -Eq '^COPY --from=coze-(server|web)' Dockerfile; then
+  fail "Dockerfile must not assemble Coze server/web from business images"
 fi
-if [ -n "$app_port" ] && [ "$nginx_listen" != "$app_port" ]; then
-  fail "hfs/conf/nginx.conf listen ($nginx_listen) must match README.md app_port ($app_port)"
-fi
-
-if [ -f cloud/hfs/README.md ] || [ -f cloud/hfs/Dockerfile ]; then
-  fail "Pattern A repo must keep Space root at repo root, not cloud/hfs/"
-fi
-
-require_grep 'Pattern A: HFS Port Repository' docs/hfs-alignment.md \
-  "docs/hfs-alignment.md must declare Pattern A"
-require_grep 'Runtime mode: image-assembly' docs/hfs-alignment.md \
-  "docs/hfs-alignment.md must declare image-assembly runtime mode"
-require_grep 'Space root: repo root' docs/hfs-alignment.md \
-  "docs/hfs-alignment.md must declare repo root as Space root"
-
-require_grep '^ARG COZE_SERVER_TAG=' Dockerfile \
-  "Dockerfile must expose COZE_SERVER_TAG build input"
-require_grep '^ARG COZE_WEB_TAG=' Dockerfile \
-  "Dockerfile must expose COZE_WEB_TAG build input"
-require_grep '^ARG COZE_SERVER_TAG=[^ ]+@sha256:[0-9a-f]{64}$' Dockerfile \
-  "Dockerfile default Coze server image must be digest-pinned"
-require_grep '^ARG COZE_WEB_TAG=[^ ]+@sha256:[0-9a-f]{64}$' Dockerfile \
-  "Dockerfile default Coze web image must be digest-pinned"
-require_grep '^ARG COZE_GIT_REF=' Dockerfile \
-  "Dockerfile must expose COZE_GIT_REF build input"
-require_grep '^ARG ELASTICSEARCH_IMAGE=' Dockerfile \
-  "Dockerfile must expose ELASTICSEARCH_IMAGE build input"
-require_grep '^ARG ELASTICSEARCH_IMAGE=[^ ]+@sha256:[0-9a-f]{64}$' Dockerfile \
-  "Dockerfile default Elasticsearch image must be digest-pinned"
-require_grep '^ARG ETCD_IMAGE=' Dockerfile \
-  "Dockerfile must expose ETCD_IMAGE build input"
-require_grep '^ARG ETCD_IMAGE=[^ ]+@sha256:[0-9a-f]{64}$' Dockerfile \
-  "Dockerfile default etcd image must be digest-pinned"
-require_grep '^ARG MILVUS_IMAGE=' Dockerfile \
-  "Dockerfile must expose MILVUS_IMAGE build input"
-require_grep '^ARG MILVUS_IMAGE=[^ ]+@sha256:[0-9a-f]{64}$' Dockerfile \
-  "Dockerfile default Milvus image must be digest-pinned"
-require_grep '^ARG DENO_VERSION=' Dockerfile \
-  "Dockerfile must expose DENO_VERSION build input"
-require_grep '^ARG DENO_SHA256_AMD64=[0-9a-f]{64}$' Dockerfile \
-  "Dockerfile must pin the Deno amd64 checksum"
-require_grep '^ARG DENO_SHA256_ARM64=[0-9a-f]{64}$' Dockerfile \
-  "Dockerfile must pin the Deno arm64 checksum"
-require_grep '^ARG ATLAS_VERSION=' Dockerfile \
-  "Dockerfile must expose ATLAS_VERSION build input"
-require_grep '^ARG ATLAS_SHA256_AMD64=[0-9a-f]{64}$' Dockerfile \
-  "Dockerfile must pin the Atlas amd64 checksum"
-require_grep '^ARG ATLAS_SHA256_ARM64=[0-9a-f]{64}$' Dockerfile \
-  "Dockerfile must pin the Atlas arm64 checksum"
-require_grep '^ARG MINIO_VERSION=' Dockerfile \
-  "Dockerfile must expose MINIO_VERSION build input"
-require_grep '^ARG MINIO_SHA256_AMD64=[0-9a-f]{64}$' Dockerfile \
-  "Dockerfile must pin the MinIO amd64 checksum"
-require_grep '^ARG MINIO_SHA256_ARM64=[0-9a-f]{64}$' Dockerfile \
-  "Dockerfile must pin the MinIO arm64 checksum"
-require_grep '^ARG MC_VERSION=' Dockerfile \
-  "Dockerfile must expose MC_VERSION build input"
-require_grep '^ARG MC_SHA256_AMD64=[0-9a-f]{64}$' Dockerfile \
-  "Dockerfile must pin the MinIO client amd64 checksum"
-require_grep '^ARG MC_SHA256_ARM64=[0-9a-f]{64}$' Dockerfile \
-  "Dockerfile must pin the MinIO client arm64 checksum"
-require_grep '^FROM cozedev/coze-studio-server:\$\{COZE_SERVER_TAG\} AS coze-server$' Dockerfile \
-  "Dockerfile must select server image from COZE_SERVER_TAG"
-require_grep '^FROM cozedev/coze-studio-web:\$\{COZE_WEB_TAG\} AS coze-web$' Dockerfile \
-  "Dockerfile must select web image from COZE_WEB_TAG"
-require_grep '^FROM \$\{ETCD_IMAGE\} AS etcd$' Dockerfile \
-  "Dockerfile must select etcd image from ETCD_IMAGE"
-require_grep '^FROM \$\{MILVUS_IMAGE\} AS milvus$' Dockerfile \
-  "Dockerfile must select Milvus image from MILVUS_IMAGE"
-require_grep '^FROM \$\{ELASTICSEARCH_IMAGE\}$' Dockerfile \
-  "Dockerfile must select runtime image from ELASTICSEARCH_IMAGE"
-require_grep 'denoland/deno/releases/download/v\$\{DENO_VERSION\}' Dockerfile \
-  "Dockerfile must select Deno version from DENO_VERSION"
-require_grep 'verify_sha256 "\$deno_sha" /tmp/deno\.zip' Dockerfile \
-  "Dockerfile must verify Deno checksum when provided"
-require_grep 'atlas-community-linux-\$\{atlas_arch\}-\$\{ATLAS_VERSION\}' Dockerfile \
-  "Dockerfile must select the pinned Atlas version"
-require_grep 'verify_sha256 "\$atlas_sha" /usr/local/bin/atlas' Dockerfile \
-  "Dockerfile must verify the Atlas binary checksum"
-require_grep 'dl\.min\.io/server/minio/release/linux-\$\{minio_arch\}/archive/minio\.\$\{MINIO_VERSION\}' Dockerfile \
-  "Dockerfile must select the pinned MinIO version"
-require_grep 'dl\.min\.io/client/mc/release/linux-\$\{minio_arch\}/archive/mc\.\$\{MC_VERSION\}' Dockerfile \
-  "Dockerfile must select the pinned MinIO client version"
-require_grep 'verify_sha256 "\$minio_sha" /usr/local/bin/minio' Dockerfile \
-  "Dockerfile must verify MinIO server checksum when provided"
-require_grep 'verify_sha256 "\$mc_sha" /usr/local/bin/mc' Dockerfile \
-  "Dockerfile must verify MinIO client checksum when provided"
+require_grep '^ARG COZE_SOURCE_COMMIT=[0-9a-f]{40}$' Dockerfile "Dockerfile must retain one immutable Coze product source commit"
+require_grep '^ARG COZE_RELEASE_TAG=v0\.5\.1$' Dockerfile "Dockerfile may retain the Coze release tag only as a label"
+require_grep 'coze-studio/\$\{COZE_SOURCE_COMMIT\}/docker/atlas/opencoze_latest_schema\.hcl' Dockerfile "Atlas schema must bind to the canonical Coze source commit"
+for image_arg in ELASTICSEARCH_IMAGE ETCD_IMAGE MILVUS_IMAGE; do
+  require_grep "^ARG ${image_arg}=[^ ]+@sha256:[0-9a-f]{64}$" Dockerfile "Dockerfile must keep ${image_arg} digest-pinned"
+done
+require_grep '^FROM \$\{ETCD_IMAGE\} AS etcd$' Dockerfile "Dockerfile must select etcd from its digest-pinned input"
+require_grep '^FROM \$\{MILVUS_IMAGE\} AS milvus$' Dockerfile "Dockerfile must select Milvus from its digest-pinned input"
+require_grep '^FROM \$\{ELASTICSEARCH_IMAGE\}$' Dockerfile "Dockerfile must select Elasticsearch from its digest-pinned input"
+for checksum_arg in DENO_SHA256_AMD64 DENO_SHA256_ARM64 ATLAS_SHA256_AMD64 ATLAS_SHA256_ARM64 MINIO_SHA256_AMD64 MINIO_SHA256_ARM64 MC_SHA256_AMD64 MC_SHA256_ARM64; do
+  require_grep "^ARG ${checksum_arg}=[0-9a-f]{64}$" Dockerfile "Dockerfile must pin ${checksum_arg}"
+done
 if grep -Eq 'curl .*\|[[:space:]]*sh' Dockerfile; then
   fail "Dockerfile must not pipe remote curl output directly into sh"
 fi
+require_grep '^      /app \\$' Dockerfile "Dockerfile must create the HF app filesystem parent"
+if grep -Eq '^      /app/runtime (\\|$)' Dockerfile; then
+  fail "Dockerfile must not pre-create the replaceable /app/runtime lower-layer directory"
+fi
+if grep -Eq '^      /opt/coze-web (\\|$)' Dockerfile; then
+  fail "Dockerfile must not pre-create the replaceable /opt/coze-web lower-layer directory"
+fi
+require_grep '^WORKDIR /opt/coze-hfs$' Dockerfile "Dockerfile must not start bootstrap inside the replaceable /app destination"
+require_grep '"destination": Path\("/app/runtime"\)' hfs/bin/bootstrap_runtime.py "server artifacts must install inside the HF /app filesystem"
 
-require_grep '/nginx-health' scripts/hf-space-smoke.sh \
-  "smoke must check /nginx-health"
-require_grep '/_ops/healthz' scripts/hf-space-smoke.sh \
-  "smoke must check /_ops/healthz"
-require_grep '/_admin/' scripts/hf-space-smoke.sh \
-  "smoke must check default /_admin behavior"
-require_grep '/sign' scripts/hf-space-smoke.sh \
-  "smoke must check /sign"
-require_grep 'x-frame-options' scripts/hf-space-smoke.sh \
-  "smoke must reject X-Frame-Options on web entry"
-require_grep 'status.*ok|ops status is not ok' scripts/hf-space-smoke.sh \
-  "smoke must assert ops JSON status"
-require_grep 'code runner is not sandbox' scripts/hf-space-smoke.sh \
-  "smoke must assert the live sandbox policy"
-require_grep 'ops-query-token-rejected' scripts/hf-space-smoke.sh \
-  "smoke must reject tokens supplied in URLs"
-require_grep 'upstream-admin-api-blocked' scripts/hf-space-smoke.sh \
-  "smoke must verify the Coze v0.5.1 admin API guard"
+require_grep 'bootstrap_runtime\.py' hfs/bin/entrypoint.sh "entrypoint must bootstrap artifacts before Supervisor"
+require_grep 'COZE_RUNTIME_MANIFEST_URI' hfs/bin/bootstrap_runtime.py "runtime bootstrap must require a manifest URL"
+require_grep 'source_kind must be commit' hfs/bin/bootstrap_runtime.py "runtime bootstrap must require immutable commit provenance"
+require_grep 'expected_build_source_name' hfs/bin/bootstrap_runtime.py "runtime bootstrap must use commit-named build provenance"
+require_grep 'checksum does not match' hfs/bin/bootstrap_runtime.py "runtime bootstrap must verify artifact checksums"
+require_grep 'MAX_UNPACKED_BYTES' hfs/bin/bootstrap_runtime.py "runtime bootstrap must bound archive extraction"
+require_grep 'install_runtime_components' hfs/bin/bootstrap_runtime.py "runtime bootstrap must stage the server and web pair together"
+require_grep '\.xethub\.hf\.co' hfs/bin/bootstrap_runtime.py "runtime bootstrap may follow only an HF Xet download redirect"
+require_grep 'bearer-authenticated runtime downloads must use huggingface\.co' hfs/bin/bootstrap_runtime.py "runtime bearer tokens must stay scoped to Hugging Face"
+require_grep 'old /app|cache|directory scan' docs/hfs-alignment.md "docs must prohibit runtime fallback paths"
+require_grep 'artifact-first' docs/release-checklist.md "release checklist must require manifest-last publication"
+require_grep 'workflow_dispatch:' .github/workflows/build-pinned-coze.yml "artifact workflow must be manual"
+require_grep 'confirmed' .github/workflows/build-pinned-coze.yml "artifact workflow must require explicit confirmation"
+require_grep 'readback' .github/workflows/build-pinned-coze.yml "artifact workflow must perform post-write readback"
+require_grep 'BUILD_SOURCE-\$\{UPSTREAM_REF\}\.json' .github/workflows/build-pinned-coze.yml "artifact workflow must publish commit-named build provenance"
+require_grep 'targetCommitish' .github/workflows/build-pinned-coze.yml "release publication must read back its target commit"
+require_grep 'verify-runtime-artifacts\.py' .github/workflows/build-pinned-coze.yml "artifact workflow must locally verify its output"
+require_grep 'actions/checkout@[0-9a-f]{40}' .github/workflows/build-pinned-coze.yml "artifact workflow must pin checkout by immutable revision"
+require_grep 'actions/upload-artifact@[0-9a-f]{40}' .github/workflows/build-pinned-coze.yml "artifact workflow must pin artifact upload by immutable revision"
+require_grep 'actions/download-artifact@[0-9a-f]{40}' .github/workflows/build-pinned-coze.yml "artifact workflow must pin artifact download by immutable revision"
+require_grep 'CANONICAL_SOURCE_COMMIT: 22275b1c2661d35344a7493cffe401e8cc61cf8e' .github/workflows/build-pinned-coze.yml "artifact workflow must bind server and web builds to the canonical Coze source commit"
+require_grep 'huggingface_hub==1\.5\.0' .github/workflows/build-pinned-coze.yml "artifact publish jobs must install a pinned Hugging Face CLI"
 
-require_grep 'location /_ops/' hfs/conf/nginx.conf \
-  "nginx must expose /_ops/ control-plane route"
-require_grep 'proxy_pass http://127\.0\.0\.1:8081/' hfs/conf/nginx.conf \
-  "nginx must proxy /_ops/ to ops service"
-require_grep 'location /_admin/' hfs/conf/nginx.conf \
-  "nginx must expose /_admin/ control-plane route"
-require_grep 'proxy_pass http://127\.0\.0\.1:8082/' hfs/conf/nginx.conf \
-  "nginx must proxy /_admin/ to admin service"
-require_grep '\[unix_http_server\]' hfs/conf/supervisord.conf \
-  "supervisor must expose local unix control socket"
-require_grep 'chmod=0700' hfs/conf/supervisord.conf \
-  "supervisor control socket must be owner-only"
-require_grep 'chown=cozeadmin:cozeadmin' hfs/conf/supervisord.conf \
-  "supervisor control socket must be isolated from the Coze runtime user"
-require_grep '\[program:admin-service\]' hfs/conf/supervisord.conf \
-  "supervisor must run admin-service"
-require_grep 'user=cozeadmin' hfs/conf/supervisord.conf \
-  "admin service must run as the dedicated cozeadmin user"
-require_grep 'ADMIN_ENABLED.*false|admin_enabled\(\).*false' hfs/bin/admin_service.py \
-  "admin service must be default-off"
-require_grep 'ALLOWED_RESTART_SERVICES' hfs/bin/admin_service.py \
-  "admin service must use a restart whitelist"
-require_grep 'OPS_TOKEN' hfs/bin/ops_service.py \
-  "ops dashboard must be token protected"
-require_grep 'tokens are not accepted in URLs' hfs/bin/ops_service.py \
-  "ops dashboard must reject query-string tokens"
-require_grep 'emit CODE_RUNNER_TYPE "sandbox"' hfs/bin/render-env.sh \
-  "Coze v0.5.1 must explicitly use the sandbox code runner"
-require_grep 'emit PERSISTENCE_REQUIRED "false"' hfs/bin/render-env.sh \
-  "persistence enforcement must stay opt-in until a volume is mounted"
-require_grep 'persistent_data' hfs/bin/ops_service.py \
-  "ops health must expose the persistent data mount check"
-require_grep 'RUN_DIR="\$\{RUN_DIR:-/run/coze\}"' hfs/bin/mysql-init.sh \
-  "mysql-init must keep runtime sockets off the data volume"
-require_grep 'RUN_DIR="\$\{RUN_DIR:-/run/coze\}"' hfs/bin/run-mariadb.sh \
-  "mariadb must keep its runtime socket off the data volume"
-require_grep '^file=/run/coze/supervisor\.sock' hfs/conf/supervisord.conf \
-  "supervisor control socket must stay off the data volume"
-require_grep '^pid /run/coze/nginx\.pid;' hfs/conf/nginx.conf \
-  "nginx pid file must stay off the data volume"
-require_grep 'proxy_temp_path /var/lib/nginx/tmp/proxy_temp;' hfs/conf/nginx.conf \
-  "nginx temp paths must stay on local container storage"
-require_grep 'ES_LOCAL_DIR="\$\{ES_LOCAL_DIR:-/var/lib/elasticsearch-data\}"' hfs/bin/run-elasticsearch.sh \
-  "elasticsearch node data must stay on local container storage"
-require_grep 'curl -fsS "http://127\.0\.0\.1:9091/healthz"' hfs/bin/run-coze-server.sh \
-  "coze-server must wait for Milvus proxy readiness, not only TCP"
-require_grep 'del "by-dev/meta/session" --prefix' hfs/bin/run-milvus.sh \
-  "milvus must clear stale session registrations from persistent etcd"
-require_grep 'MILVUS_LOCAL_DIR="\$\{MILVUS_LOCAL_DIR:-/var/lib/milvus-local\}"' hfs/bin/run-milvus.sh \
-  "milvus local rocksmq state must stay on local container storage"
-require_grep 'location \^~ /api/admin/' hfs/conf/nginx.conf \
-  "nginx must block the fail-open Coze v0.5.1 admin API"
-require_grep 'admin-disabled-root' scripts/admin-smoke.sh \
-  "admin smoke must verify default disabled behavior"
-require_grep 'Content-Security-Policy ".*frame-ancestors https://huggingface\.co https://\*\.hf\.space" always' hfs/conf/nginx.conf \
-  "nginx must emit frame-ancestors CSP for Hugging Face iframe embedding"
+require_grep '/nginx-health' scripts/hf-space-smoke.sh "smoke must check /nginx-health"
+require_grep '/_ops/healthz' scripts/hf-space-smoke.sh "smoke must check /_ops/healthz"
+require_grep 'ops-version.*_ops/version' scripts/hf-space-smoke.sh "smoke must check protected runtime provenance"
+require_grep '/_admin/' scripts/hf-space-smoke.sh "smoke must check default /_admin behavior"
+require_grep '/sign' scripts/hf-space-smoke.sh "smoke must check /sign"
+require_grep 'tokens are not accepted in URLs' hfs/bin/ops_service.py "ops dashboard must reject query-string tokens"
+require_grep 'runtime_provenance' hfs/bin/ops_service.py "ops version payload must expose safe runtime provenance"
+require_grep 'runtime_provenance.*runtime_provenance_payload' hfs/bin/ops_service.py "canonical health must require bootstrap provenance"
+require_grep 'emit CODE_RUNNER_TYPE "sandbox"' hfs/bin/render-env.sh "Coze must explicitly use the sandbox code runner"
+require_grep 'RUN_DIR="\$\{RUN_DIR:-/run/coze\}"' hfs/bin/mysql-init.sh "mysql sockets must stay off the data volume"
+require_grep '^file=/run/coze/supervisor\.sock' hfs/conf/supervisord.conf "supervisor socket must stay off the data volume"
+require_grep '^pid /run/coze/nginx\.pid;' hfs/conf/nginx.conf "nginx pid must stay off the data volume"
+require_grep 'location \^~ /api/admin/' hfs/conf/nginx.conf "nginx must block the upstream fail-open admin API"
+require_grep 'Content-Security-Policy ".*frame-ancestors https://huggingface\.co https://\*\.hf\.space" always' hfs/conf/nginx.conf "nginx must retain Hugging Face iframe CSP"
 
-require_ignore_pattern ".env.local"
-require_ignore_pattern "/local/"
-require_ignore_pattern "**/local/"
-require_ignore_pattern "*.secret"
-require_ignore_pattern "*.key"
-require_ignore_pattern "*.pem"
+require_ignore_pattern '.env'
+require_ignore_pattern '.env.*'
+require_ignore_pattern '/local/'
+require_ignore_pattern '**/local/'
+require_ignore_pattern '*.secret'
+require_ignore_pattern '*.key'
+require_ignore_pattern '*.pem'
+git check-ignore -q .env
+git check-ignore -q .env.local
+git check-ignore -q local/coze-studio-hfs-poc/README.md
 
 if [ "$errors" -ne 0 ]; then
   exit 1
 fi
-
-echo "hfs contract checks passed"
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s hfs/tests -p 'test_bootstrap_runtime.py'
+printf 'hfs v2 hybrid contract checks passed\n'

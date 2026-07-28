@@ -36,14 +36,35 @@ class OpsServiceTests(unittest.TestCase):
         self.original_env = os.environ.copy()
         self.original_data_dir = ops_service.DATA_DIR
         self.original_log_dir = ops_service.LOG_DIR
+        self.original_runtime_provenance_file = ops_service.RUNTIME_PROVENANCE_FILE
         self.original_tcp_check = ops_service.tcp_check
+        self.runtime_provenance_dir = tempfile.TemporaryDirectory()
+        ops_service.RUNTIME_PROVENANCE_FILE = Path(self.runtime_provenance_dir.name) / "runtime-provenance.json"
+        ops_service.RUNTIME_PROVENANCE_FILE.write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "manifest_sha256": "a" * 64,
+                    "source_kind": "commit",
+                    "source_ref": "b" * 40,
+                    "build_source": {"artifact": f"BUILD_SOURCE-{'b' * 40}.json", "sha256": "c" * 64},
+                    "artifacts": [
+                        {"component": "server", "artifact": f"coze-server-app-{'b' * 40}.tar.gz", "sha256": "d" * 64, "size_bytes": 1},
+                        {"component": "web", "artifact": f"coze-web-dist-{'b' * 40}.tar.gz", "sha256": "e" * 64, "size_bytes": 1},
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
 
     def tearDown(self):
         os.environ.clear()
         os.environ.update(self.original_env)
         ops_service.DATA_DIR = self.original_data_dir
         ops_service.LOG_DIR = self.original_log_dir
+        ops_service.RUNTIME_PROVENANCE_FILE = self.original_runtime_provenance_file
         ops_service.tcp_check = self.original_tcp_check
+        self.runtime_provenance_dir.cleanup()
 
     def test_health_payload_ok_includes_minio_by_default(self):
         ops_service.tcp_check = lambda host, port, timeout=1.0: True
@@ -86,6 +107,16 @@ class OpsServiceTests(unittest.TestCase):
         self.assertEqual(code, 503)
         self.assertEqual(payload["status"], "degraded")
         self.assertFalse(payload["checks"]["coze_server"])
+
+    def test_health_payload_fails_closed_without_verified_runtime_provenance(self):
+        ops_service.tcp_check = lambda host, port, timeout=1.0: True
+        ops_service.RUNTIME_PROVENANCE_FILE.unlink()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            ops_service.DATA_DIR = Path(tmpdir)
+            code, payload = ops_service.health_payload()
+
+        self.assertEqual(code, 503)
+        self.assertFalse(payload["checks"]["runtime_provenance"])
 
     def test_health_payload_fails_when_required_persistence_is_not_mounted(self):
         ops_service.tcp_check = lambda host, port, timeout=1.0: True
@@ -146,9 +177,36 @@ class OpsServiceTests(unittest.TestCase):
             self.assertIsNone(ops_service.safe_log_filename("escape.log"))
 
     def test_process_matching_does_not_need_supervisor_control_socket(self):
-        self.assertEqual(ops_service.process_names_for("/app/opencoze"), ["coze-server"])
+        self.assertEqual(ops_service.process_names_for("/app/runtime/opencoze"), ["coze-server"])
         self.assertEqual(ops_service.process_names_for("python3 /opt/coze-hfs/bin/ops_service.py"), ["ops-service"])
         self.assertEqual(ops_service.process_names_for("unrelated-worker"), [])
+
+    def test_version_payload_exposes_checksum_provenance_without_runtime_url(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            provenance = Path(tmpdir) / "runtime-provenance.json"
+            provenance.write_text(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "manifest_sha256": "a" * 64,
+                        "source_kind": "commit",
+                        "source_ref": "b" * 40,
+                        "build_source": {"artifact": f"BUILD_SOURCE-{'b' * 40}.json", "sha256": "c" * 64},
+                        "artifacts": [
+                            {"component": "server", "artifact": f"coze-server-app-{'b' * 40}.tar.gz", "sha256": "d" * 64, "size_bytes": 1},
+                            {"component": "web", "artifact": f"coze-web-dist-{'b' * 40}.tar.gz", "sha256": "e" * 64, "size_bytes": 1},
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            ops_service.RUNTIME_PROVENANCE_FILE = provenance
+            payload = ops_service.version_payload()
+
+        runtime = payload["coze"]["runtime_provenance"]
+        self.assertTrue(runtime["available"])
+        self.assertEqual(runtime["source_ref"], "b" * 40)
+        self.assertNotIn("url", json.dumps(runtime))
 
     def test_ops_dashboard_requires_token_for_protected_endpoint(self):
         os.environ["OPS_TOKEN"] = "test-ops-token-that-is-long-enough"
@@ -168,6 +226,30 @@ class OpsServiceTests(unittest.TestCase):
 
         self.assertEqual(response.status, 401)
         self.assertEqual(body["status"], "unauthorized")
+
+    def test_explicit_ops_header_takes_precedence_over_gateway_bearer(self):
+        token = "test-ops-token-that-is-long-enough"
+        os.environ["OPS_TOKEN"] = token
+        server = ThreadingHTTPServer(("127.0.0.1", 0), QuietHandler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        self.addCleanup(server.server_close)
+        self.addCleanup(thread.join, 2)
+        self.addCleanup(server.shutdown)
+        host, port = server.server_address
+
+        conn = http.client.HTTPConnection(host, port, timeout=5)
+        conn.request(
+            "GET",
+            "/_ops/version",
+            headers={"X-Ops-Token": token, "Authorization": "Bearer hf-gateway-token"},
+        )
+        response = conn.getresponse()
+        body = json.loads(response.read().decode("utf-8"))
+        conn.close()
+
+        self.assertEqual(response.status, 200)
+        self.assertEqual(body["coze"]["runtime_provenance"]["source_ref"], "b" * 40)
 
     def test_ops_dashboard_rejects_short_token_configuration(self):
         os.environ["OPS_TOKEN"] = "too-short"

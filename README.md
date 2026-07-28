@@ -16,12 +16,15 @@ license: gpl-3.0
 
 ## 当前形态
 
-镜像构建采用 Coze Studio 官方镜像组装模式：
+仓库采用 HFS v2 hybrid 交付边界：
 
-- `cozedev/coze-studio-server:0.5.1@sha256:bacce3aa5960a2f18362eac93317e42a8c0dbd125a44ec47519f12a8a27c7744`
-- `cozedev/coze-studio-web:0.5.1@sha256:a137a16ab75b871b08911ca87359fc8981b225b63b94cf3e0979069fbd862aea`
-- `coze-dev/coze-studio` 的 `v0.5.1` MySQL schema / Atlas schema
-- Elasticsearch 运行层，内置 Nginx、Supervisor、MariaDB、Redis、NATS JetStream、MinIO fallback、etcd、Milvus、Elasticsearch
+- reviewable Pattern A wrapper：根目录的 `Dockerfile`、`hfs/`、docs、static gates 和 runtime bootstrap
+- Coze server/web：由 `COZE_RUNTIME_MANIFEST_URI` 的单一 manifest 选择，启动时下载、SHA-256 校验、共同 staging 后以可恢复方式安装的不可变 artifact 对
+- `coze-dev/coze-studio` 的同一不可变 commit MySQL schema / Atlas schema（`v0.5.1` 仅作 release label）
+- Elasticsearch、etcd、Milvus：仍为 digest-pinned image-input deviation，待逐组件可运行证明后再决定是否抽取
+- 内置 Nginx、Supervisor、MariaDB、Redis、NATS JetStream、MinIO fallback、etcd、Milvus、Elasticsearch
+
+运行 manifest 必须记录完整 source commit、commit-named `BUILD_SOURCE-<commit>.json` checksum、server/web artifact 名称、SHA-256 与 size。manifest 或 artifact 出错会 fail-closed；不会回退到旧 `/app`、`latest`、缓存、目录扫描或备用 URI。
 
 外部只暴露 Hugging Face 的单一端口 `7860`。Nginx 在容器内汇聚：
 
@@ -115,7 +118,9 @@ ADMIN_TOKEN=
 
 ## ENV 管理
 
-公开说明见 [docs/env-reference.md](docs/env-reference.md)。本机私有记录放在 `.env.local`，该文件被 `.gitignore` 和 `.dockerignore` 忽略，不会进入 GitHub、Hugging Face 或 Docker build context。
+公开说明见 [docs/env-reference.md](docs/env-reference.md)。本机部署值记录在 gitignored `.env`（从无密 `.env.example` 开始）；遗留 `.env.local` 同样保持忽略，不会进入 GitHub、Hugging Face 或 Docker build context。同步顺序固定为本地改值 → diff → 经批准 push → readback，不在网页直接留下未回收的配置。
+
+首次切换到 artifact runtime 前，Space Variable 必须设置无凭据的直接 HTTPS `COZE_RUNTIME_MANIFEST_URI`；private `hfs-dist` 如需认证，另以 Space Secret 提供 `COZE_RUNTIME_DOWNLOAD_TOKEN`。两者均需由发布 workflow 的 artifact/readback/manifest-last 证据支撑，不能填入 URL query 或从旧镜像回退。
 
 最小公开运行推荐显式配置：
 

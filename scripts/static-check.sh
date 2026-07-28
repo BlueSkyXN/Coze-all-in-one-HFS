@@ -47,7 +47,9 @@ required=(
   hfs/AGENTS.md
   hfs/bin/entrypoint.sh
   hfs/bin/render-env.sh
+  hfs/bin/bootstrap_runtime.py
   hfs/bin/ops_service.py
+  hfs/tests/test_bootstrap_runtime.py
   hfs/bin/admin_service.py
   hfs/bin/run-admin-service.sh
   hfs/conf/nginx.conf
@@ -57,6 +59,8 @@ required=(
   docs/release-checklist.md
   scripts/admin-smoke.sh
   scripts/validate-hfs-contract.sh
+  scripts/verify-runtime-artifacts.py
+  .env.example
 )
 
 for f in "${required[@]}"; do
@@ -69,7 +73,8 @@ done
 grep -q '^sdk: docker$' README.md
 grep -q '^app_port: 7860$' README.md
 grep -q '^EXPOSE 7860$' Dockerfile
-grep -q 'canonical_health_endpoint = "/_ops/healthz"' hfs-dev.toml
+grep -q '^standard = "2.0"$' hfs-dev.toml
+grep -q '^lane = "artifact"$' hfs-dev.toml
 grep -q '/_admin/' hfs/conf/nginx.conf
 
 scripts/validate-hfs-contract.sh
@@ -79,8 +84,22 @@ find hfs scripts -type f -name '*.sh' -print0 | while IFS= read -r -d '' f; do
   bash -n "$f"
 done
 
-python3 -m py_compile hfs/bin/ops_service.py hfs/bin/admin_service.py
-python3 -m unittest discover -s hfs/tests -p 'test_*.py'
+python3 - <<'PY'
+import py_compile
+import tempfile
+from pathlib import Path
+
+sources = [
+    Path("hfs/bin/bootstrap_runtime.py"),
+    Path("hfs/bin/ops_service.py"),
+    Path("hfs/bin/admin_service.py"),
+    Path("scripts/verify-runtime-artifacts.py"),
+]
+with tempfile.TemporaryDirectory() as directory:
+    for source in sources:
+        py_compile.compile(str(source), cfile=str(Path(directory) / f"{source.name}.pyc"), doraise=True)
+PY
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s hfs/tests -p 'test_*.py'
 if command -v shellcheck >/dev/null 2>&1; then
   shellcheck hfs/bin/*.sh scripts/*.sh
 else

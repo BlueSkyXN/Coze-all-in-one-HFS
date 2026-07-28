@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # shellcheck disable=SC1090
-source "${COZE_ENV_FILE:-/app/.env}"
+source "${COZE_ENV_FILE:-/app/runtime/.env}"
 
 if [ "${ENABLE_LOCAL_MINIO:-1}" != "1" ]; then
   echo "[minio-init] local MinIO disabled; skipping"

@@ -1,17 +1,11 @@
 standard = "2.0"
 project = "coze-all-in-one-hfs"
-space = "BlueSkyXN/Coze-all-in-one-HFS"
+space = "BlueSkyXN/Coze-all-in-one-HFS-v2-candidate"
 sovereignty = "port"
-# The v2 registry uses artifact because the delivered Coze server/web payloads
-# are artifacts. This remains a hybrid implementation because the reviewable
-# Pattern A wrapper and the verified infrastructure-image deviations stay here.
 lane = "artifact"
 version_source = "commit"
 
-# Local control-plane credentials only. They are never sent to the Space.
 local_only = ["HF_TOKEN", "GH_TOKEN"]
-
-# Key names only; values remain in the protected local .env and/or Space Settings.
 secrets = [
   "COZE_RUNTIME_DOWNLOAD_TOKEN",
   "OPS_TOKEN",
@@ -64,10 +58,8 @@ variables = [
 ]
 
 dist_bucket = "hfs-dist"
-# This port has no deployable configuration seed; runtime config stays upstream-managed.
 seed_file = ""
 other_objects = []
-
 deviations = [
   "hybrid-wrapper = Pattern A wrapper remains source-reviewed while only Coze server/web are manifest-selected artifacts.",
   "business-image = Elasticsearch, etcd, and Milvus remain digest-pinned image inputs until each extraction, dynamic-library, cold-start, and persistence proof is approved.",

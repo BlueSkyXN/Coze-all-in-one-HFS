@@ -46,21 +46,24 @@ local processes:
 
 ## Build Inputs
 
-默认开发输入：
+构建与启动输入分层：
 
-| Surface | Default | Purpose |
+| Surface | Default / contract | Purpose |
 | --- | --- | --- |
-| `COZE_SERVER_TAG` | `0.5.1@sha256:bacce3aa...7744` | digest-pinned `cozedev/coze-studio-server` image |
-| `COZE_WEB_TAG` | `0.5.1@sha256:a137a16a...2aea` | digest-pinned `cozedev/coze-studio-web` image |
-| `COZE_GIT_REF` | `v0.5.1` | schema and Atlas source ref |
-| `ELASTICSEARCH_IMAGE` | `bitnamilegacy/elasticsearch:8.18.0@sha256:4a7d1422...5a38` | digest-pinned runtime base image and local ES |
-| `ETCD_IMAGE` | `bitnamilegacy/etcd:3.5@sha256:1b9977cf...69d0` | digest-pinned local etcd for Milvus |
-| `MILVUS_IMAGE` | `milvusdb/milvus:v2.5.10@sha256:02e1d60d...4379` | digest-pinned local vector store |
-| `DENO_VERSION` | `2.4.5` | Deno binary used by Coze runtime |
-| `ATLAS_VERSION` | `v1.2.0` + amd64/arm64 SHA-256 | checksum-verified Atlas CLI |
-| `MINIO_VERSION` / `MC_VERSION` | fixed releases + amd64/arm64 SHA-256 | checksum-verified MinIO server/client |
+| `COZE_RUNTIME_MANIFEST_URI` | required Space Variable | One direct HTTPS runtime manifest selecting server/web artifacts. |
+| manifest `source_ref` | full 40-character commit | Immutable server/web source provenance. |
+| manifest `BUILD_SOURCE-<source_commit>.json` | SHA-256 checked | Producer repository, source commit, Dockerfile hashes and workflow provenance. |
+| manifest server/web artifacts | name includes full commit + SHA-256 + size | Startup downloads and atomically installs each payload. |
+| `COZE_SOURCE_COMMIT` | full 40-character commit | Canonical source for server/web artifacts, schema, and Atlas HCL. |
+| `COZE_RELEASE_TAG` | `v0.5.1` | Descriptive release label only; never runtime provenance. |
+| `ELASTICSEARCH_IMAGE` | digest-pinned | Retained runtime-base/local ES deviation. |
+| `ETCD_IMAGE` | digest-pinned | Retained local etcd deviation for Milvus. |
+| `MILVUS_IMAGE` | digest-pinned | Retained local vector-store deviation. |
+| `DENO_VERSION` | `2.4.5` + architecture SHA-256 | Downloaded runtime binary. |
+| `ATLAS_VERSION` | `v1.2.0` + architecture SHA-256 | Checksum-verified Atlas CLI. |
+| `MINIO_VERSION` / `MC_VERSION` | fixed releases + architecture SHA-256 | Checksum-verified MinIO server/client. |
 
-Coze server/web 默认镜像已 pin 到 `v0.5.1` 的 manifest digest；Elasticsearch、etcd、Milvus 同样 digest-pinned，Deno、Atlas、MinIO、MC 使用固定版本加双架构 SHA-256，安装前强制校验，不允许空 checksum。
+Coze server/web no longer enter the Space image through `FROM`/`COPY`. A bad or unavailable manifest, commit-named `BUILD_SOURCE-<commit>.json`, checksum, size, archive layout, executable bit or dynamic dependency stops startup. Elasticsearch, etcd and Milvus stay explicitly digest-pinned deviations until component extraction has real runtime evidence.
 
 Coze v0.5.1 的 bootstrap 文件包含 MySQL 8.0 专属 collation `utf8mb4_0900_ai_ci`。本仓库在 build 阶段把 `schema.sql` 和 Atlas HCL 规范化为 `utf8mb4_unicode_ci`，以保持 MariaDB 运行层可启动。首次初始化导入 `schema.sql` 后执行 Atlas reconcile；已存在的数据目录按 HCL SHA-256 判断是否需要 reconcile。Atlas 失败会使启动失败，schema marker 只在成功后原子更新。
 
@@ -139,4 +142,4 @@ run-health-checks
 
 禁止在 `/_ops` 增加写操作、shell、SQL、restart、delete、secret rotation 或配置修改。`/_admin` 也不接受任意 shell command；后续如果新增写 action，必须继续使用独立 token、专用 OS identity、白名单、`confirm=true`、CSRF 和 audit。
 
-Coze `v0.5.1` 在 `CODE_RUNNER_TYPE` 为空时会选择 local runner。本 wrapper 在生成 `/app/.env` 时显式写入 `CODE_RUNNER_TYPE=sandbox`，并保留 HF Variable 覆盖能力，避免重写官方 image env 后退回直接本地执行。
+Coze `v0.5.1` 在 `CODE_RUNNER_TYPE` 为空时会选择 local runner。本 wrapper 在生成 `/app/runtime/.env` 时显式写入 `CODE_RUNNER_TYPE=sandbox`，并保留 HF Variable 覆盖能力，避免重写官方 image env 后退回直接本地执行。

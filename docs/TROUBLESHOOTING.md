@@ -9,23 +9,16 @@ hf spaces info BlueSkyXN/Coze-all-in-one-HFS
 git ls-remote https://huggingface.co/spaces/BlueSkyXN/Coze-all-in-one-HFS refs/heads/main
 ```
 
-## Build 在 Coze 镜像 tag 失败
+## Runtime manifest 或 artifact bootstrap 失败
 
-先确认 tag 存在，再改 build surface：
+`COZE_RUNTIME_MANIFEST_URI` 必须是无 query、fragment、嵌入凭据的 `https://huggingface.co/...` URL。启动只允许同域 `huggingface.co` 中间跳转或 Hugging Face 的 `*.xethub.hf.co` Xet 下载跳转；Bearer 只在同域保留，进入 Xet 下载域前移除，其他跳转一律拒绝。manifest 仍须包含完整 40 位 commit、按同一 commit 命名的 `BUILD_SOURCE-<commit>.json` SHA-256、server/web artifact SHA-256 与 size。检查顺序：
 
-```bash
-git ls-remote --tags https://github.com/coze-dev/coze-studio.git 'refs/tags/v0.5.1'
-```
+1. 用 `scripts/verify-runtime-artifacts.py --manifest <manifest> --artifacts-dir <dir>` 在发布前复验 Release 文件。
+2. 确认 manifest、commit-named `BUILD_SOURCE-<commit>.json`、server 和 web 已 artifact-first 上传并逐字节 readback；manifest 必须最后写入。
+3. 若下载面私有，确认 `COZE_RUNTIME_DOWNLOAD_TOKEN` 仅作为 Space Secret 存在；Bearer 只发送给 `huggingface.co`，不会转发到 Xet 下载域，也不要把 token 放 URL。
+4. 从受 `OPS_TOKEN` 保护的 `/_ops/version` 回读 source commit、manifest checksum 和 artifact checksums，不要从日志或 URL 查 token。
 
-Dockerfile 默认：
-
-```text
-COZE_SERVER_TAG=0.5.1
-COZE_WEB_TAG=0.5.1
-COZE_GIT_REF=v0.5.1
-```
-
-三者必须保持同一上游版本线。
+不允许通过旧 `/app`、缓存、目录扫描、`latest` 或备用 URI 让容器继续启动。`COZE_SOURCE_COMMIT` 同时绑定 schema、Atlas HCL 与 server/web runtime artifact；`COZE_RELEASE_TAG=v0.5.1` 仅是描述性 label，不能替代 commit provenance。
 
 ## DB schema import fails
 
@@ -54,7 +47,7 @@ curl -fsS https://blueskyxn-coze-all-in-one-hfs.hf.space/_ops/healthz
 - `etcd=false`：Milvus 依赖的 etcd 未启动。
 - `elasticsearch=false`：ES 未启动或 `analysis-smartcn` / index template 初始化失败。
 - `milvus=false`：Milvus standalone 未启动，先看 etcd/MinIO 依赖；如果日志出现 `libaio.so.1`、`libgomp.so.1` 或 `libopenblas.so.0`，说明 final image 缺 Milvus runtime 动态库。
-- `coze_server=false`：Coze Server 未监听 `8888`，继续看 ES、VectorStore、DB 或 model 初始化错误；如果日志出现 `/app/opencoze: cannot execute: required file not found`，说明 Alpine/musl ABI 的 Coze server 二进制缺动态加载器。
+- `coze_server=false`：Coze Server 未监听 `8888`，继续看 ES、VectorStore、DB 或 model 初始化错误；如果日志出现 `/app/runtime/opencoze: cannot execute: required file not found`，说明 Alpine/musl ABI 的 Coze server 二进制缺动态加载器。
 
 如果已配置 `OPS_TOKEN`，继续查看只读诊断面：
 
@@ -105,7 +98,7 @@ ADMIN_TOKEN=$ADMIN_TOKEN \
 
 ## `/admin` 或 `/api/admin/*` 返回 404
 
-这是 Coze `v0.5.1` 的临时安全 guard，不是 Nginx 路由遗漏。该版本的 upstream admin middleware 在 admin email 为空时会 fail-open；wrapper 在匹配的 upstream 修复版 server/web 镜像发布前阻断内置 admin UI/API。运行策略通过 HF Variables/Secrets 和 `/app/.env` 管理，不要绕过该 guard。
+这是 Coze `v0.5.1` 的临时安全 guard，不是 Nginx 路由遗漏。该版本的 upstream admin middleware 在 admin email 为空时会 fail-open；wrapper 在匹配的 upstream 修复版 server/web 镜像发布前阻断内置 admin UI/API。运行策略通过 HF Variables/Secrets 和 `/app/runtime/.env` 管理，不要绕过该 guard。
 
 ## 登录或注册被拦
 
@@ -125,7 +118,7 @@ ALLOW_REGISTRATION_EMAIL=you@example.com
 
 ## Code runner 不在 sandbox
 
-生成的 `/app/.env` 应包含：
+生成的 `/app/runtime/.env` 应包含：
 
 ```text
 CODE_RUNNER_TYPE=sandbox

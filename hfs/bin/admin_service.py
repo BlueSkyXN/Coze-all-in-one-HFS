@@ -748,9 +748,10 @@ class Handler(BaseHTTPRequestHandler):
 
     def auth_context(self) -> AuthContext | None:
         token = self.headers.get("X-Admin-Token", "")
-        auth = self.headers.get("Authorization", "")
-        if auth.lower().startswith("bearer "):
-            token = auth.split(None, 1)[1]
+        if not token:
+            auth = self.headers.get("Authorization", "")
+            if auth.lower().startswith("bearer "):
+                token = auth.split(None, 1)[1]
         if token and hmac.compare_digest(token, admin_token()):
             return AuthContext(kind="header", csrf_token="")
         cookie_header = self.headers.get("Cookie", "")

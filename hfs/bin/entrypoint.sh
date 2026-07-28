@@ -16,6 +16,9 @@ mkdir -p \
   "$DATA_DIR/etcd" \
   "$DATA_DIR/logs"
 
+echo "[entrypoint] bootstrapping immutable Coze runtime"
+/opt/coze-hfs/bin/bootstrap_runtime.py
+
 echo "[entrypoint] rendering env"
 /opt/coze-hfs/bin/render-env.sh
 

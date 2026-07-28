@@ -11,6 +11,12 @@ ADMIN_TOKEN="${ADMIN_TOKEN:-}"
 SMOKE_ADMIN_ENABLED="${SMOKE_ADMIN_ENABLED:-${ADMIN_ENABLED:-false}}"
 SMOKE_ADMIN_ACTIONS="${SMOKE_ADMIN_ACTIONS:-false}"
 SMOKE_PERSISTENCE_REQUIRED="${SMOKE_PERSISTENCE_REQUIRED:-${PERSISTENCE_REQUIRED:-false}}"
+HF_GATEWAY_TOKEN="${HF_GATEWAY_TOKEN:-}"
+
+hf_gateway_args=()
+if [ -n "$HF_GATEWAY_TOKEN" ]; then
+  hf_gateway_args=(-H "Authorization: Bearer ${HF_GATEWAY_TOKEN}")
+fi
 
 tmp_body=$(mktemp)
 tmp_headers=$(mktemp)
@@ -26,7 +32,8 @@ fetch_path() {
   for attempt in $(seq 1 "$SMOKE_RETRIES"); do
     : >"$tmp_body"
     : >"$tmp_headers"
-    status=$(curl -sS -L -D "$tmp_headers" -o "$tmp_body" -w '%{http_code}' --max-time "$SMOKE_TIMEOUT" "${base}${path}" || true)
+    status=$(curl -sS -L -D "$tmp_headers" -o "$tmp_body" -w '%{http_code}' --max-time "$SMOKE_TIMEOUT" \
+      "${hf_gateway_args[@]}" "${base}${path}" || true)
     if [ "$status" = "$expected" ]; then
       printf 'PASS %s: HTTP %s\n' "$label" "$status"
       return 0
@@ -93,6 +100,7 @@ check_ops() {
   for attempt in $(seq 1 "$SMOKE_RETRIES"); do
     : >"$tmp_body"
     status=$(curl -sS -L -o "$tmp_body" -w '%{http_code}' --max-time "$SMOKE_TIMEOUT" \
+      "${hf_gateway_args[@]}" \
       -H "X-Ops-Token: $OPS_TOKEN" \
       "${base}${path}" || true)
     if [ "$status" = "200" ]; then
@@ -121,6 +129,7 @@ check_admin() {
   for attempt in $(seq 1 "$SMOKE_RETRIES"); do
     : >"$tmp_body"
     status=$(curl -sS -L -o "$tmp_body" -w '%{http_code}' --max-time "$SMOKE_TIMEOUT" \
+      "${hf_gateway_args[@]}" \
       -H "X-Admin-Token: $ADMIN_TOKEN" \
       "${base}${path}" || true)
     if [ "$status" = "200" ]; then
@@ -144,6 +153,7 @@ check_admin_action() {
     return 0
   fi
   status=$(curl -sS -o "$tmp_body" -w '%{http_code}' --max-time 60 \
+    "${hf_gateway_args[@]}" \
     -X POST \
     -H "X-Admin-Token: $ADMIN_TOKEN" \
     -H "X-Admin-CSRF: smoke" \
@@ -157,6 +167,32 @@ check_admin_action() {
   printf 'FAIL admin-run-health-checks: expected HTTP 200, got %s\n' "$status" >&2
   sed -n '1,80p' "$tmp_body" >&2 || true
   return 1
+}
+
+check_runtime_provenance_json() {
+  if [ -z "$OPS_TOKEN" ]; then
+    printf 'SKIP ops-version-json: OPS_TOKEN is not set\n'
+    return 0
+  fi
+  python3 - "$tmp_body" <<'PY'
+import json
+import re
+import sys
+from pathlib import Path
+
+payload = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+provenance = payload.get("coze", {}).get("runtime_provenance", {})
+if provenance.get("available") is not True:
+    raise SystemExit("runtime provenance is unavailable")
+if not re.fullmatch(r"[0-9a-f]{40}", provenance.get("source_ref", "")):
+    raise SystemExit("runtime provenance source_ref is not a full commit")
+if not re.fullmatch(r"[0-9a-f]{64}", provenance.get("manifest_sha256", "")):
+    raise SystemExit("runtime provenance manifest checksum is invalid")
+artifacts = provenance.get("artifacts")
+if not isinstance(artifacts, list) or {item.get("component") for item in artifacts if isinstance(item, dict)} != {"server", "web"}:
+    raise SystemExit("runtime provenance does not contain exactly server and web artifacts")
+PY
+  printf 'PASS ops-version-json: immutable runtime provenance is present\n'
 }
 
 check_sign_page() {
@@ -185,6 +221,8 @@ else
   fetch_path "admin-disabled" "/_admin/" "404"
 fi
 check_ops "ops-health" "/_ops/health"
+check_ops "ops-version" "/_ops/version"
+check_runtime_provenance_json
 check_ops "ops-system" "/_ops/system"
 check_ops "ops-metrics" "/_ops/metrics"
 check_ops "ops-errors" "/_ops/errors"

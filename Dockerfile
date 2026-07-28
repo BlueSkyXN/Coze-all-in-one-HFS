@@ -1,22 +1,21 @@
 # syntax=docker/dockerfile:1.7
 
-ARG COZE_SERVER_TAG=0.5.1@sha256:bacce3aa5960a2f18362eac93317e42a8c0dbd125a44ec47519f12a8a27c7744
-ARG COZE_WEB_TAG=0.5.1@sha256:a137a16ab75b871b08911ca87359fc8981b225b63b94cf3e0979069fbd862aea
-ARG COZE_GIT_REF=v0.5.1
+# One immutable Coze product source binds server, web, MySQL schema, Atlas HCL,
+# and Elasticsearch bootstrap payloads.  COZE_RELEASE_TAG is descriptive only.
+ARG COZE_SOURCE_COMMIT=22275b1c2661d35344a7493cffe401e8cc61cf8e
+ARG COZE_RELEASE_TAG=v0.5.1
+# These retained image inputs are documented hybrid-lane deviations. They stay
+# digest-pinned until a component-specific extraction and cold-start proof exists.
 ARG ELASTICSEARCH_IMAGE=bitnamilegacy/elasticsearch:8.18.0@sha256:4a7d14222c876a87c1ddd38e1128d8e42df80071b09ec54db5c32586c9cf5a38
 ARG ETCD_IMAGE=bitnamilegacy/etcd:3.5@sha256:1b9977cf4cce7546873e0ee50e684c38a38a4e7a27d22086fbd2b8a1b44a69d0
 ARG MILVUS_IMAGE=milvusdb/milvus:v2.5.10@sha256:02e1d60d71ab60f435c60076f4fed2abe59602ecd5e18dcfe229c8c558c4379d
 
-FROM cozedev/coze-studio-server:${COZE_SERVER_TAG} AS coze-server
-FROM cozedev/coze-studio-web:${COZE_WEB_TAG} AS coze-web
 FROM ${ETCD_IMAGE} AS etcd
 FROM ${MILVUS_IMAGE} AS milvus
-
 FROM ${ELASTICSEARCH_IMAGE}
 
-ARG COZE_SERVER_TAG
-ARG COZE_WEB_TAG
-ARG COZE_GIT_REF
+ARG COZE_SOURCE_COMMIT
+ARG COZE_RELEASE_TAG
 ARG TARGETARCH
 ARG DENO_VERSION=2.4.5
 ARG DENO_SHA256_AMD64=6f9d8115bb3df582c0c5674507e906323b680be0f0b15e735d0cd5ec6be44444
@@ -36,16 +35,15 @@ LABEL org.opencontainers.image.title="Coze all-in-one HFS" \
       org.opencontainers.image.source="https://github.com/BlueSkyXN/Coze-all-in-one-HFS"
 
 ENV HOME=/home/user \
-    PATH=/app/.venv/bin:/milvus/bin:/opt/bitnami/etcd/bin:/opt/bitnami/elasticsearch/bin:/opt/bitnami/java/bin:/home/user/.local/bin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+    PATH=/app/runtime/.venv/bin:/milvus/bin:/opt/bitnami/etcd/bin:/opt/bitnami/elasticsearch/bin:/opt/bitnami/java/bin:/home/user/.local/bin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
     JAVA_HOME=/opt/bitnami/java \
     ES_JAVA_HOME=/opt/bitnami/java \
     APP_PORT=7860 \
     DATA_DIR=/data/coze \
-    COZE_APP_DIR=/app \
+    COZE_APP_DIR=/app/runtime \
     COZE_WEB_DIR=/opt/coze-web \
-    COZE_SERVER_TAG=${COZE_SERVER_TAG} \
-    COZE_WEB_TAG=${COZE_WEB_TAG} \
-    COZE_GIT_REF=${COZE_GIT_REF} \
+    COZE_SOURCE_COMMIT=${COZE_SOURCE_COMMIT} \
+    COZE_RELEASE_TAG=${COZE_RELEASE_TAG} \
     CODE_RUNNER_TYPE=sandbox \
     SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
 
@@ -156,6 +154,7 @@ RUN set -eux; \
     getent group cozeadmin >/dev/null || groupadd --system cozeadmin; \
     id -u cozeadmin >/dev/null 2>&1 || useradd --system --gid cozeadmin --home-dir /nonexistent --shell /bin/false cozeadmin; \
     mkdir -p \
+      /app \
       /bitnami/elasticsearch/data \
       /bitnami/etcd \
       /data/coze \
@@ -167,48 +166,43 @@ RUN set -eux; \
       /opt/coze-hfs/conf \
       /opt/coze-hfs/elasticsearch/es_index_schema \
       /opt/coze/bootstrap \
-      /opt/coze-web \
       /run/nginx \
       /var/lib/milvus \
       /var/lib/nginx/tmp \
       /var/log/nginx; \
-    chown -R user:user /data /opt/coze-hfs /opt/coze /opt/coze-web /run/nginx /var/lib/nginx /var/log/nginx /home/user; \
+    chown -R user:user /data /opt/coze-hfs /opt/coze /run/nginx /var/lib/nginx /var/log/nginx /home/user; \
     chown -R cozeadmin:cozeadmin /data/coze/admin
 
-COPY --from=coze-server /app /app
-COPY --from=coze-web /usr/share/nginx/html/ /opt/coze-web/
-
-# Fetch bootstrap/config files corresponding to the selected Coze git tag.
+# Server and web payloads are downloaded by bootstrap_runtime.py from one
+# manifest-selected, checksum-verified artifact pair during container startup.
+# Fetch schema, Atlas HCL, and Elasticsearch bootstrap files from the same
+# immutable commit as the server and web runtime artifacts.
 RUN set -eux; \
-    curl -fsSL "https://raw.githubusercontent.com/coze-dev/coze-studio/${COZE_GIT_REF}/docker/volumes/mysql/schema.sql" -o /opt/coze/bootstrap/schema.sql; \
-    curl -fsSL "https://raw.githubusercontent.com/coze-dev/coze-studio/${COZE_GIT_REF}/docker/atlas/opencoze_latest_schema.hcl" -o /opt/coze/bootstrap/opencoze_latest_schema.hcl; \
-    curl -fsSL "https://raw.githubusercontent.com/coze-dev/coze-studio/${COZE_GIT_REF}/docker/volumes/elasticsearch/elasticsearch.yml" -o /opt/coze-hfs/elasticsearch/elasticsearch.yml; \
-    curl -fsSL "https://raw.githubusercontent.com/coze-dev/coze-studio/${COZE_GIT_REF}/docker/volumes/elasticsearch/analysis-smartcn.zip" -o /opt/coze-hfs/elasticsearch/analysis-smartcn.zip; \
-    curl -fsSL "https://raw.githubusercontent.com/coze-dev/coze-studio/${COZE_GIT_REF}/docker/volumes/elasticsearch/es_index_schema/coze_resource.index-template.json" -o /opt/coze-hfs/elasticsearch/es_index_schema/coze_resource.index-template.json; \
-    curl -fsSL "https://raw.githubusercontent.com/coze-dev/coze-studio/${COZE_GIT_REF}/docker/volumes/elasticsearch/es_index_schema/project_draft.index-template.json" -o /opt/coze-hfs/elasticsearch/es_index_schema/project_draft.index-template.json; \
+    curl -fsSL "https://raw.githubusercontent.com/coze-dev/coze-studio/${COZE_SOURCE_COMMIT}/docker/volumes/mysql/schema.sql" -o /opt/coze/bootstrap/schema.sql; \
+    curl -fsSL "https://raw.githubusercontent.com/coze-dev/coze-studio/${COZE_SOURCE_COMMIT}/docker/atlas/opencoze_latest_schema.hcl" -o /opt/coze/bootstrap/opencoze_latest_schema.hcl; \
+    curl -fsSL "https://raw.githubusercontent.com/coze-dev/coze-studio/${COZE_SOURCE_COMMIT}/docker/volumes/elasticsearch/elasticsearch.yml" -o /opt/coze-hfs/elasticsearch/elasticsearch.yml; \
+    curl -fsSL "https://raw.githubusercontent.com/coze-dev/coze-studio/${COZE_SOURCE_COMMIT}/docker/volumes/elasticsearch/analysis-smartcn.zip" -o /opt/coze-hfs/elasticsearch/analysis-smartcn.zip; \
+    curl -fsSL "https://raw.githubusercontent.com/coze-dev/coze-studio/${COZE_SOURCE_COMMIT}/docker/volumes/elasticsearch/es_index_schema/coze_resource.index-template.json" -o /opt/coze-hfs/elasticsearch/es_index_schema/coze_resource.index-template.json; \
+    curl -fsSL "https://raw.githubusercontent.com/coze-dev/coze-studio/${COZE_SOURCE_COMMIT}/docker/volumes/elasticsearch/es_index_schema/project_draft.index-template.json" -o /opt/coze-hfs/elasticsearch/es_index_schema/project_draft.index-template.json; \
     sed -i 's/utf8mb4_0900_ai_ci/utf8mb4_unicode_ci/g' /opt/coze/bootstrap/schema.sql /opt/coze/bootstrap/opencoze_latest_schema.hcl; \
     cp /opt/coze-hfs/elasticsearch/elasticsearch.yml /opt/bitnami/elasticsearch/config/my_elasticsearch.yml; \
-    chown -R user:user /app /opt/coze /opt/coze-web /opt/coze-hfs
+    chown -R user:user /app /opt/coze /opt/coze-hfs
 
 COPY hfs/bin/ /opt/coze-hfs/bin/
 COPY hfs/conf/ /opt/coze-hfs/conf/
 
-RUN chmod +x /opt/coze-hfs/bin/*.sh \
+RUN chmod +x /opt/coze-hfs/bin/*.sh /opt/coze-hfs/bin/bootstrap_runtime.py \
     && elasticsearch-plugin install --batch file:///opt/coze-hfs/elasticsearch/analysis-smartcn.zip \
     && LD_LIBRARY_PATH=/milvus/lib ldd /milvus/bin/milvus > /tmp/milvus.ldd \
     && cat /tmp/milvus.ldd \
     && ! grep -q "not found" /tmp/milvus.ldd \
-    && file /app/opencoze \
-    && ldd /app/opencoze > /tmp/opencoze.ldd \
-    && cat /tmp/opencoze.ldd \
-    && ! grep -q "not found" /tmp/opencoze.ldd \
     && test -x /usr/bin/tini \
     && test -x /usr/bin/python3 \
     && test -x /usr/sbin/nats-server \
-    && chown -R user:user /opt/coze-hfs /app /opt/coze /opt/coze-web /data/coze \
+    && chown -R user:user /opt/coze-hfs /app /opt/coze /data/coze \
     && chown -R cozeadmin:cozeadmin /data/coze/admin
 
-WORKDIR /app
+WORKDIR /opt/coze-hfs
 
 EXPOSE 7860
 

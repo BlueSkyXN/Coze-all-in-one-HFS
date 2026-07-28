@@ -1,21 +1,14 @@
 # ENV Reference
 
-`.env.local` 是本机私有 ENV 台账，不是 runtime 自动加载文件，也不是要上传到 GitHub 或 Hugging Face 的 env-file。公开仓库只维护本文件这类 reference：写 key、分类、默认值、建议位置和说明，不写真实值。
+`.env` 是本机私有 HFS v2 value ledger，不是 runtime 自动加载文件，也不是要上传到 GitHub 或 Hugging Face 的 env-file。以无密 `.env.example` 起步；遗留 `.env.local` 继续保持 gitignored。公开仓库只维护本文件这类 reference：写 key、分类、默认值、建议位置和说明，不写真实值。
 
-当前远端回读时间：2026-07-25。
-
-| 平台 | 当前状态 |
-| --- | --- |
-| GitHub Variables | 未配置 |
-| GitHub Secrets | 未配置 |
-| Hugging Face Variables | `ADMIN_ENABLED`、`CODE_RUNNER_TYPE`、`COZE_PUBLIC_URL`、`DISABLE_USER_REGISTRATION`、`ENABLE_LOCAL_MINIO`、`LOG_LEVEL`、`PERSISTENCE_REQUIRED` |
-| Hugging Face Secrets | `OPS_TOKEN`；模型、存储、检索等 secrets 尚未配置 |
-| Hugging Face Space | `private=true`；`/data/coze` 挂载 read-write bucket volume（`hf://buckets/BlueSkyXN/coze-all-in-one-hfs-data`），`PERSISTENCE_REQUIRED=true` |
+远端 Settings、Space visibility、mount 与 Secret presence 必须在实际发布窗口重新只读回读；本文不把历史盘点当作当前部署事实。
 
 ## 推荐 HF Variables
 
 | Key | 默认值 | 建议 | 说明 |
 | --- | --- | --- | --- |
+| `COZE_RUNTIME_MANIFEST_URI` | 空 | artifact runtime 必填 | 直接 HTTPS manifest URL；不得带 query、fragment 或嵌入凭据。bootstrap 只读取一次，按 manifest 下载同目录的 按 source commit 命名的 `BUILD_SOURCE-<commit>.json`、server、web。 |
 | `DISABLE_USER_REGISTRATION` | `true` | `true` | 公开 Space 默认关闭注册。 |
 | `ALLOW_REGISTRATION_EMAIL` | 空 | 按需填写并做注册 smoke | `v0.5.1` fresh fallback config 存在 upstream 读取缺陷，不能只凭 env 值确认 allowlist 生效；含个人邮箱时不写公开 PR 文案。 |
 | `ENABLE_LOCAL_MINIO` | `1` | P0/P1 可保留 `1` | 本地 MinIO fallback；设为 `0` 时必须提供外部 object storage，并确保内置 Milvus 可访问 `MINIO_ADDRESS`。 |
@@ -34,6 +27,7 @@
 
 | Key | 用途 | 说明 |
 | --- | --- | --- |
+| `COZE_RUNTIME_DOWNLOAD_TOKEN` | 私有 artifact 下载 bearer token | 仅在直接 HTTPS artifact endpoint 需要认证时设置；只经 header 发送，绝不放 URI。 |
 | `MODEL_API_KEY_0` | 默认模型 API key | OpenAI-compatible 模型配置。 |
 | `BUILTIN_CM_OPENAI_API_KEY` | 内置 conversation model key | 通常与默认模型 key 同源。 |
 | `OPENAI_EMBEDDING_API_KEY` | Embedding key | 启用知识库/RAG 时配置。 |
@@ -134,7 +128,7 @@ POST /_admin/api/actions/run-health-checks
 
 Coze `v0.5.1` 自带的 `/admin`、`/api/admin/*` 因 upstream admin email 空配置 fail-open 被 Nginx 临时阻断。不要把 `/_admin` 与 upstream 内置 admin UI/API 混为一谈。
 
-## 本地 `.env.local` 台账格式
+## 本地 `.env` 台账格式
 
 推荐保留四层：
 

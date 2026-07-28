@@ -19,7 +19,7 @@ The upstream product source of truth is `coze-dev/coze-studio` and the `cozedev/
 | Path | Responsibility | Local AGENTS.md | Read when |
 |---|---|---:|---|
 | `Dockerfile` | Builds the all-in-one HFS image from Coze, Elasticsearch, etcd, Milvus, Deno, Atlas, and MinIO inputs. | No | Before changing image sources, ARG defaults, exposed ports, installed packages, copied runtime files, healthcheck, or entrypoint. |
-| `hfs-dev.toml` | HFS contract manifest for Pattern A, repo-root Space layout, release pins, required files, port, and canonical health endpoint. | No | Before changing release pins, required files, runtime mode, public port, or health endpoint. |
+| `hfs-dev.toml` | Minimal HFS v2 semantic registry for Pattern A, Setting key names, artifact lane and declared hybrid deviations. | No | Before changing registry relations, Settings keys, delivery lane, public port, or health endpoint. |
 | `README.md` | Hugging Face Space metadata and operator-facing repository overview. | No | Before changing Space metadata, SDK/app port claims, or public setup guidance. |
 | `hfs/` | High-risk runtime glue: entrypoint, service scripts, Nginx, Supervisor, MariaDB/Redis/NATS/MinIO glue, ops health, and local runtime tests. | Yes | Always before modifying anything under `hfs/`, and also before changing `Dockerfile` lines that copy or execute `hfs/` content. |
 | `scripts/` | Repository validation, HFS contract checks, local Docker helpers, and live Hugging Face smoke checks. | No | Before changing command behavior, exit codes, smoke expectations, or CI-facing checks. |
@@ -61,10 +61,10 @@ scripts/static-check.sh
 ## Global rules
 
 - Keep this repository aligned with HFS Pattern A: `space_root_mode = "repo-root"`, `hfs_dir = "."`, public port `7860`, and canonical health endpoint `/_ops/healthz`.
-- Treat `hfs-dev.toml` as the HFS contract source. If `Dockerfile`, `hfs/`, `scripts/`, docs, or release pins change in a way that affects the contract, update the manifest and validation script together.
+- Treat `hfs-dev.toml` as the minimal HFS v2 relation registry. Keep runtime pins/checksums in Docker/build/bootstrap source, not in a second manifest table. If `Dockerfile`, `hfs/`, `scripts/`, docs, or registered Settings change, update the relevant contract gate and docs together.
 - Keep root-level deployed files self-contained. The Hugging Face Space must be able to build from the repository root without depending on `local/`.
-- Use upstream Coze tags/images intentionally. `COZE_SERVER_TAG`, `COZE_WEB_TAG`, and `COZE_GIT_REF` must stay aligned unless the user explicitly requests a split.
-- Release-oriented image or artifact inputs in `hfs-dev.toml` must remain represented as structured `[[release_pins]]`.
+- Keep `COZE_SOURCE_COMMIT` as the single schema/Atlas/server/web source. `COZE_RELEASE_TAG` is a descriptive release label only; runtime delivery uses the full immutable commit and checksums in the runtime manifest and commit-named `BUILD_SOURCE-<commit>.json`. Do not reintroduce business images as a fallback.
+- Elasticsearch, etcd, and Milvus remain digest-pinned Docker deviations until a reviewed extraction proof exists. Record HFS relation changes in `hfs-dev.toml`, but keep their actual pins in Dockerfile.
 - Default local scripting should use Bash and Python standard library. Do not add long-term dependencies unless the user approves the reason and alternatives.
 - Use `python3` in commands and docs. Do not assume `python` exists on this machine.
 - `/_ops/*` endpoints are read-only diagnostics. They may report state but must not expose shell execution, SQL execution, restarts, deletes, secret rotation, config writes, or arbitrary command execution.
