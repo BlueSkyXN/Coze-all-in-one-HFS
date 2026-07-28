@@ -11,6 +11,12 @@ ADMIN_TOKEN="${ADMIN_TOKEN:-}"
 SMOKE_ADMIN_ENABLED="${SMOKE_ADMIN_ENABLED:-${ADMIN_ENABLED:-false}}"
 SMOKE_ADMIN_ACTIONS="${SMOKE_ADMIN_ACTIONS:-false}"
 SMOKE_PERSISTENCE_REQUIRED="${SMOKE_PERSISTENCE_REQUIRED:-${PERSISTENCE_REQUIRED:-false}}"
+HF_GATEWAY_TOKEN="${HF_GATEWAY_TOKEN:-}"
+
+hf_gateway_args=()
+if [ -n "$HF_GATEWAY_TOKEN" ]; then
+  hf_gateway_args=(-H "Authorization: Bearer ${HF_GATEWAY_TOKEN}")
+fi
 
 tmp_body=$(mktemp)
 tmp_headers=$(mktemp)
@@ -26,7 +32,8 @@ fetch_path() {
   for attempt in $(seq 1 "$SMOKE_RETRIES"); do
     : >"$tmp_body"
     : >"$tmp_headers"
-    status=$(curl -sS -L -D "$tmp_headers" -o "$tmp_body" -w '%{http_code}' --max-time "$SMOKE_TIMEOUT" "${base}${path}" || true)
+    status=$(curl -sS -L -D "$tmp_headers" -o "$tmp_body" -w '%{http_code}' --max-time "$SMOKE_TIMEOUT" \
+      "${hf_gateway_args[@]}" "${base}${path}" || true)
     if [ "$status" = "$expected" ]; then
       printf 'PASS %s: HTTP %s\n' "$label" "$status"
       return 0
@@ -93,6 +100,7 @@ check_ops() {
   for attempt in $(seq 1 "$SMOKE_RETRIES"); do
     : >"$tmp_body"
     status=$(curl -sS -L -o "$tmp_body" -w '%{http_code}' --max-time "$SMOKE_TIMEOUT" \
+      "${hf_gateway_args[@]}" \
       -H "X-Ops-Token: $OPS_TOKEN" \
       "${base}${path}" || true)
     if [ "$status" = "200" ]; then
@@ -121,6 +129,7 @@ check_admin() {
   for attempt in $(seq 1 "$SMOKE_RETRIES"); do
     : >"$tmp_body"
     status=$(curl -sS -L -o "$tmp_body" -w '%{http_code}' --max-time "$SMOKE_TIMEOUT" \
+      "${hf_gateway_args[@]}" \
       -H "X-Admin-Token: $ADMIN_TOKEN" \
       "${base}${path}" || true)
     if [ "$status" = "200" ]; then
@@ -144,6 +153,7 @@ check_admin_action() {
     return 0
   fi
   status=$(curl -sS -o "$tmp_body" -w '%{http_code}' --max-time 60 \
+    "${hf_gateway_args[@]}" \
     -X POST \
     -H "X-Admin-Token: $ADMIN_TOKEN" \
     -H "X-Admin-CSRF: smoke" \
