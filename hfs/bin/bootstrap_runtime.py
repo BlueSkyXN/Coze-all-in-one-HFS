@@ -99,7 +99,10 @@ def download(url: str, destination: Path, token: str) -> None:
                 if copied > MAX_ARTIFACT_BYTES:
                     raise BootstrapError("runtime download exceeds the maximum supported size")
                 output.write(chunk)
-    except (OSError, ValueError, urllib.error.URLError, urllib.error.HTTPError) as exc:
+    except urllib.error.HTTPError as exc:
+        host = urllib.parse.urlsplit(exc.url).hostname or "unknown-host"
+        raise BootstrapError(f"runtime download returned HTTP {exc.code} from {host}") from exc
+    except (OSError, ValueError, urllib.error.URLError) as exc:
         if isinstance(exc, BootstrapError):
             raise
         raise BootstrapError(f"unable to download runtime input: {exc.__class__.__name__}") from exc
