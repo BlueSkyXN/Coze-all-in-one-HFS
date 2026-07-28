@@ -55,7 +55,11 @@ class SafeArtifactRedirect(urllib.request.HTTPRedirectHandler):
 
     def redirect_request(self, req: Any, fp: Any, code: int, msg: str, headers: Any, newurl: str) -> Any:
         target = urllib.parse.urlsplit(newurl)
-        if target.scheme != "https" or target.hostname != "cas-bridge.xethub.hf.co":
+        if (
+            target.scheme != "https"
+            or not target.hostname
+            or not target.hostname.endswith(".xethub.hf.co")
+        ):
             raise urllib.error.HTTPError(req.full_url, code, "artifact redirect target is not allowed", headers, fp)
         return urllib.request.Request(
             newurl,

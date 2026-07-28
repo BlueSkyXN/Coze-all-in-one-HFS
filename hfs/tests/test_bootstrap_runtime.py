@@ -104,6 +104,16 @@ class BootstrapRuntimeTests(unittest.TestCase):
         self.assertEqual(redirected.get_header("Authorization"), None)
         self.assertEqual(redirected.get_header("User-agent"), "coze-hfs-runtime-bootstrap/1")
 
+        regional = handler.redirect_request(
+            request,
+            None,
+            302,
+            "Found",
+            {},
+            "https://cas-server.xethub.hf.co/xet-object?signature=test",
+        )
+        self.assertIsNotNone(regional)
+
         with self.assertRaises(bootstrap.urllib.error.HTTPError):
             handler.redirect_request(
                 request,
@@ -112,6 +122,15 @@ class BootstrapRuntimeTests(unittest.TestCase):
                 "Found",
                 {},
                 "https://example.com/exfiltrate",
+            )
+        with self.assertRaises(bootstrap.urllib.error.HTTPError):
+            handler.redirect_request(
+                request,
+                None,
+                302,
+                "Found",
+                {},
+                "https://evilxethub.hf.co/exfiltrate",
             )
 
     def test_bearer_downloads_are_restricted_to_huggingface(self):
