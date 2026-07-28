@@ -104,6 +104,16 @@ class BootstrapRuntimeTests(unittest.TestCase):
         self.assertEqual(redirected.get_header("Authorization"), None)
         self.assertEqual(redirected.get_header("User-agent"), "coze-hfs-runtime-bootstrap/1")
 
+        same_host = handler.redirect_request(
+            request,
+            None,
+            302,
+            "Found",
+            {},
+            "https://huggingface.co/api/resolve-cache/manifest.json",
+        )
+        self.assertEqual(same_host.get_header("Authorization"), "Bearer test-token")
+
         regional = handler.redirect_request(
             request,
             None,
