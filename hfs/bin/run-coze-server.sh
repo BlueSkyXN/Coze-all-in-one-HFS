@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # shellcheck disable=SC1090
-source "${COZE_ENV_FILE:-/app/.env}"
+source "${COZE_ENV_FILE:-/app/runtime/.env}"
 
 /opt/coze-hfs/bin/wait-for.sh 127.0.0.1 "${MYSQL_PORT:-3306}" 180
 /opt/coze-hfs/bin/wait-for.sh 127.0.0.1 6379 120
@@ -32,5 +32,5 @@ if [ "$milvus_ready" != "true" ]; then
   exit 1
 fi
 
-cd /app
-exec /app/opencoze
+cd /app/runtime
+exec /app/runtime/opencoze

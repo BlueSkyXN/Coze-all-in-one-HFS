@@ -156,8 +156,9 @@ done
 if grep -Eq 'curl .*\|[[:space:]]*sh' Dockerfile; then
   fail "Dockerfile must not pipe remote curl output directly into sh"
 fi
-require_grep '^      /app \\$' Dockerfile "Dockerfile must create the artifact destination before ownership checks"
+require_grep '^      /app/runtime \\$' Dockerfile "Dockerfile must create the artifact destination inside the HF /app filesystem"
 require_grep '^WORKDIR /opt/coze-hfs$' Dockerfile "Dockerfile must not start bootstrap inside the replaceable /app destination"
+require_grep '"destination": Path\("/app/runtime"\)' hfs/bin/bootstrap_runtime.py "server artifacts must install inside the HF /app filesystem"
 
 require_grep 'bootstrap_runtime\.py' hfs/bin/entrypoint.sh "entrypoint must bootstrap artifacts before Supervisor"
 require_grep 'COZE_RUNTIME_MANIFEST_URI' hfs/bin/bootstrap_runtime.py "runtime bootstrap must require a manifest URL"

@@ -177,7 +177,7 @@ class OpsServiceTests(unittest.TestCase):
             self.assertIsNone(ops_service.safe_log_filename("escape.log"))
 
     def test_process_matching_does_not_need_supervisor_control_socket(self):
-        self.assertEqual(ops_service.process_names_for("/app/opencoze"), ["coze-server"])
+        self.assertEqual(ops_service.process_names_for("/app/runtime/opencoze"), ["coze-server"])
         self.assertEqual(ops_service.process_names_for("python3 /opt/coze-hfs/bin/ops_service.py"), ["ops-service"])
         self.assertEqual(ops_service.process_names_for("unrelated-worker"), [])
 

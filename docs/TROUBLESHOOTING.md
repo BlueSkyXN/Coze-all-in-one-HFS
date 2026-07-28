@@ -47,7 +47,7 @@ curl -fsS https://blueskyxn-coze-all-in-one-hfs.hf.space/_ops/healthz
 - `etcd=false`：Milvus 依赖的 etcd 未启动。
 - `elasticsearch=false`：ES 未启动或 `analysis-smartcn` / index template 初始化失败。
 - `milvus=false`：Milvus standalone 未启动，先看 etcd/MinIO 依赖；如果日志出现 `libaio.so.1`、`libgomp.so.1` 或 `libopenblas.so.0`，说明 final image 缺 Milvus runtime 动态库。
-- `coze_server=false`：Coze Server 未监听 `8888`，继续看 ES、VectorStore、DB 或 model 初始化错误；如果日志出现 `/app/opencoze: cannot execute: required file not found`，说明 Alpine/musl ABI 的 Coze server 二进制缺动态加载器。
+- `coze_server=false`：Coze Server 未监听 `8888`，继续看 ES、VectorStore、DB 或 model 初始化错误；如果日志出现 `/app/runtime/opencoze: cannot execute: required file not found`，说明 Alpine/musl ABI 的 Coze server 二进制缺动态加载器。
 
 如果已配置 `OPS_TOKEN`，继续查看只读诊断面：
 
@@ -98,7 +98,7 @@ ADMIN_TOKEN=$ADMIN_TOKEN \
 
 ## `/admin` 或 `/api/admin/*` 返回 404
 
-这是 Coze `v0.5.1` 的临时安全 guard，不是 Nginx 路由遗漏。该版本的 upstream admin middleware 在 admin email 为空时会 fail-open；wrapper 在匹配的 upstream 修复版 server/web 镜像发布前阻断内置 admin UI/API。运行策略通过 HF Variables/Secrets 和 `/app/.env` 管理，不要绕过该 guard。
+这是 Coze `v0.5.1` 的临时安全 guard，不是 Nginx 路由遗漏。该版本的 upstream admin middleware 在 admin email 为空时会 fail-open；wrapper 在匹配的 upstream 修复版 server/web 镜像发布前阻断内置 admin UI/API。运行策略通过 HF Variables/Secrets 和 `/app/runtime/.env` 管理，不要绕过该 guard。
 
 ## 登录或注册被拦
 
@@ -118,7 +118,7 @@ ALLOW_REGISTRATION_EMAIL=you@example.com
 
 ## Code runner 不在 sandbox
 
-生成的 `/app/.env` 应包含：
+生成的 `/app/runtime/.env` 应包含：
 
 ```text
 CODE_RUNNER_TYPE=sandbox

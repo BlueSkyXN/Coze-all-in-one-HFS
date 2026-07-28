@@ -129,7 +129,7 @@ PROCESS_MATCHERS = {
     "etcd": ("/etcd",),
     "elasticsearch": ("elasticsearch",),
     "milvus": ("/milvus/bin/milvus",),
-    "coze-server": ("/app/opencoze",),
+    "coze-server": ("/app/runtime/opencoze",),
     "ops-service": ("ops_service.py",),
     "admin-service": ("admin_service.py",),
     "nginx": ("nginx",),

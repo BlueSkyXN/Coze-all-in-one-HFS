@@ -142,4 +142,4 @@ run-health-checks
 
 禁止在 `/_ops` 增加写操作、shell、SQL、restart、delete、secret rotation 或配置修改。`/_admin` 也不接受任意 shell command；后续如果新增写 action，必须继续使用独立 token、专用 OS identity、白名单、`confirm=true`、CSRF 和 audit。
 
-Coze `v0.5.1` 在 `CODE_RUNNER_TYPE` 为空时会选择 local runner。本 wrapper 在生成 `/app/.env` 时显式写入 `CODE_RUNNER_TYPE=sandbox`，并保留 HF Variable 覆盖能力，避免重写官方 image env 后退回直接本地执行。
+Coze `v0.5.1` 在 `CODE_RUNNER_TYPE` 为空时会选择 local runner。本 wrapper 在生成 `/app/runtime/.env` 时显式写入 `CODE_RUNNER_TYPE=sandbox`，并保留 HF Variable 覆盖能力，避免重写官方 image env 后退回直接本地执行。

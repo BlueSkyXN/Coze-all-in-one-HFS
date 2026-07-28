@@ -22,7 +22,7 @@ Coze server 与 web 是不可变 runtime artifacts。启动时 `bootstrap_runtim
 1. 只读取一次 `COZE_RUNTIME_MANIFEST_URI` 指向的 Hugging Face HTTPS `manifest.json`；URL 不允许 query、fragment 或嵌入凭据。仅允许 `huggingface.co` 同域中间跳转和 `*.xethub.hf.co` 下载跳转；Bearer 只在同域保留，进入 Xet 域前移除。
 2. 只接受 `schema_version=1`、完整 40 位 Git commit、按该 commit 命名的 `BUILD_SOURCE-<commit>.json` checksum，以及恰好一份 server 和 web artifact。
 3. 从 manifest 同目录下载按 commit 命名的 `BUILD_SOURCE-<commit>.json`、server 和 web；分别校验 SHA-256、size、完整 component provenance、tar path/link/device/privileged-mode safety、解包上限与必需入口文件。两个 payload 先共同完成 staging 与动态库验证，再安装；任一替换失败会恢复两个先前目录。
-4. 仅将成功校验的 payload 原子安装至 `/app` 与 `/opt/coze-web`。下载和解包临时文件只在 `/tmp`，不会写入 `/data/coze`。
+4. 仅将成功校验的 payload 原子安装至 `/app/runtime` 与 `/opt/coze-web`。server staging 与目标均位于 HF 的 `/app` filesystem，避免跨设备 rename；下载文件仍只在 `/tmp`，不会写入 `/data/coze`。
 5. 任一 manifest、网络、checksum、size、archive、动态库或安装错误都会非零退出；不会扫描目录、使用 `latest`、旧 `/app`、本地缓存或备用 URI。
 
 `COZE_RUNTIME_DOWNLOAD_TOKEN` 是可选 Space Secret，仅以 Authorization header 发送，不进入 URL、日志或 provenance。私有 `hfs-dist` 的实际直连 URL / access model 必须在发布前由 owner 验证；不能以非空 token 或网页可见性代替 readback。

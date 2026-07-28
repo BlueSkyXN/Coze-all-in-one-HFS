@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ENV_FILE="${COZE_ENV_FILE:-/app/.env}"
+ENV_FILE="${COZE_ENV_FILE:-/app/runtime/.env}"
 DATA_DIR="${DATA_DIR:-/data/coze}"
 GENERATED_ENV_FILE="${COZE_GENERATED_ENV_FILE:-$DATA_DIR/generated-secrets.env}"
 SPACE_HOST_VALUE="${SPACE_HOST:-}"

@@ -30,7 +30,7 @@ Key files: `bin/entrypoint.sh`, `bin/bootstrap_runtime.py`, `bin/healthcheck.sh`
 - `/_ops/*` must not expose shell, SQL, restart, delete, secret rotation, config writes, or arbitrary command execution.
 - `/_admin/*` remains default-off, uses a separate token, and runs as the dedicated `cozeadmin` OS user. Do not give the shared Coze runtime `user` access to the Supervisor control socket.
 - Coze `v0.5.1` upstream `/admin` and `/api/admin/*` stay blocked until a matching server/web release contains the fail-closed admin authorization fix.
-- Coze server/web payloads are installed only by `bootstrap_runtime.py` from the one manifest selected by `COZE_RUNTIME_MANIFEST_URI`. Keep its HTTPS, checksum, tar-safety, atomic-install, no-redirect, and fail-closed rules; do not add a cache, `latest`, old `/app`, directory scan, or URI fallback.
+- Coze server/web payloads are installed only by `bootstrap_runtime.py` from the one manifest selected by `COZE_RUNTIME_MANIFEST_URI`. The server installs at `/app/runtime` so staging and replacement stay within HF's `/app` filesystem. Keep its HTTPS, checksum, tar-safety, atomic-install, redirect allowlist, and fail-closed rules; do not add a cache, `latest`, old `/app`, directory scan, or URI fallback.
 - `/data/coze` is the persistent root. Runtime data for MySQL/MariaDB, Redis, NATS, MinIO, etcd, Milvus, and Elasticsearch must not be written back into the image layer. Runtime artifact downloads/unpack must stay outside it.
 - Nginx must retain `/nginx-health`, `/_ops/*` proxying, Coze Web static routing, Coze Server API proxying, and `/local_storage/` fallback boundaries.
 - `ENABLE_LOCAL_MINIO=0` only disables bundled MinIO startup; embedded Milvus still needs `MINIO_ADDRESS` pointing at reachable object storage.

@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Load generated Coze env.
 # shellcheck disable=SC1090
-source "${COZE_ENV_FILE:-/app/.env}"
+source "${COZE_ENV_FILE:-/app/runtime/.env}"
 
 DATA_DIR="${DATA_DIR:-/data/coze}"
 RUN_DIR="${RUN_DIR:-/run/coze}"

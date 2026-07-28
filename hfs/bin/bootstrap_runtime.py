@@ -30,7 +30,7 @@ MAX_ARTIFACT_MEMBERS = 100_000
 MAX_UNPACKED_BYTES = 16 * 1024 * 1024 * 1024
 COMPONENTS = {
     "server": {
-        "destination": Path("/app"),
+        "destination": Path("/app/runtime"),
         "required": Path("opencoze"),
         "artifact_prefix": "coze-server-app",
         "dockerfile": "backend/Dockerfile",
@@ -389,15 +389,14 @@ def main() -> int:
         raise BootstrapError("COZE_RUNTIME_MANIFEST_URI is required")
     require_https_url(manifest_url, "COZE_RUNTIME_MANIFEST_URI")
 
-    app_dir = Path(os.environ.get("COZE_APP_DIR", "/app"))
+    app_dir = Path(os.environ.get("COZE_APP_DIR", "/app/runtime"))
     web_dir = Path(os.environ.get("COZE_WEB_DIR", "/opt/coze-web"))
     if app_dir != COMPONENTS["server"]["destination"] or web_dir != COMPONENTS["web"]["destination"]:
-        raise BootstrapError("runtime destinations must remain /app and /opt/coze-web")
+        raise BootstrapError("runtime destinations must remain /app/runtime and /opt/coze-web")
     run_dir = Path(os.environ.get("RUN_DIR", "/run/coze"))
 
-    # Docker previously started in /app, which is one of the directories this
-    # process replaces. Leave every runtime destination before staging so the
-    # install does not depend on filesystem-specific rename-of-cwd behavior.
+    # Leave every runtime destination before staging so the install does not
+    # depend on filesystem-specific rename-of-cwd behavior.
     try:
         os.chdir("/")
     except OSError as exc:

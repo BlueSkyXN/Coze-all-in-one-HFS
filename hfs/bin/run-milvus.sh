@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # shellcheck disable=SC1090
-source "${COZE_ENV_FILE:-/app/.env}"
+source "${COZE_ENV_FILE:-/app/runtime/.env}"
 DATA_DIR="${DATA_DIR:-/data/coze}"
 MILVUS_LOCAL_DIR="${MILVUS_LOCAL_DIR:-/var/lib/milvus-local}"
 

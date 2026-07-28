@@ -35,12 +35,12 @@ LABEL org.opencontainers.image.title="Coze all-in-one HFS" \
       org.opencontainers.image.source="https://github.com/BlueSkyXN/Coze-all-in-one-HFS"
 
 ENV HOME=/home/user \
-    PATH=/app/.venv/bin:/milvus/bin:/opt/bitnami/etcd/bin:/opt/bitnami/elasticsearch/bin:/opt/bitnami/java/bin:/home/user/.local/bin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+    PATH=/app/runtime/.venv/bin:/milvus/bin:/opt/bitnami/etcd/bin:/opt/bitnami/elasticsearch/bin:/opt/bitnami/java/bin:/home/user/.local/bin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
     JAVA_HOME=/opt/bitnami/java \
     ES_JAVA_HOME=/opt/bitnami/java \
     APP_PORT=7860 \
     DATA_DIR=/data/coze \
-    COZE_APP_DIR=/app \
+    COZE_APP_DIR=/app/runtime \
     COZE_WEB_DIR=/opt/coze-web \
     COZE_SOURCE_COMMIT=${COZE_SOURCE_COMMIT} \
     COZE_RELEASE_TAG=${COZE_RELEASE_TAG} \
@@ -154,7 +154,7 @@ RUN set -eux; \
     getent group cozeadmin >/dev/null || groupadd --system cozeadmin; \
     id -u cozeadmin >/dev/null 2>&1 || useradd --system --gid cozeadmin --home-dir /nonexistent --shell /bin/false cozeadmin; \
     mkdir -p \
-      /app \
+      /app/runtime \
       /bitnami/elasticsearch/data \
       /bitnami/etcd \
       /data/coze \
