@@ -48,6 +48,7 @@ required_files=(
   README.md
   Dockerfile
   hfs-dev.toml
+  hfs-dev.candidate.toml
   .env.example
   AGENTS.md
   hfs/AGENTS.md
@@ -81,6 +82,7 @@ from pathlib import Path
 
 root = Path(sys.argv[1])
 manifest = tomllib.loads((root / "hfs-dev.toml").read_text(encoding="utf-8"))
+candidate = tomllib.loads((root / "hfs-dev.candidate.toml").read_text(encoding="utf-8"))
 expected = {
     "standard": "2.0",
     "project": "coze-all-in-one-hfs",
@@ -93,6 +95,11 @@ expected = {
 required_secrets = {"COZE_RUNTIME_DOWNLOAD_TOKEN", "OPS_TOKEN", "ADMIN_TOKEN"}
 required_variables = {"COZE_RUNTIME_MANIFEST_URI", "PERSISTENCE_REQUIRED", "CODE_RUNNER_TYPE", "MODEL_PROTOCOL_0", "S3_ENDPOINT"}
 failures: list[str] = []
+if candidate.get("space") != "BlueSkyXN/Coze-all-in-one-HFS-v2-candidate":
+    failures.append("candidate manifest must target BlueSkyXN/Coze-all-in-one-HFS-v2-candidate")
+for key in ("standard", "project", "sovereignty", "lane", "version_source", "local_only", "secrets", "variables", "dist_bucket", "seed_file", "other_objects", "deviations"):
+    if candidate.get(key) != manifest.get(key):
+        failures.append(f"candidate manifest {key} must match production manifest")
 for key, value in expected.items():
     if manifest.get(key) != value:
         failures.append(f"hfs-dev.toml {key} must be {value!r}, got {manifest.get(key)!r}")
