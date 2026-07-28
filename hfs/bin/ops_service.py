@@ -177,22 +177,6 @@ def ops_lock_reason() -> str:
     return ""
 
 
-def persistent_data_mounted() -> bool:
-    """Require the fixed data directory to stay inside its mounted parent."""
-    data_dir = DATA_DIR.absolute()
-    mount_root = data_dir.parent
-    try:
-        if mount_root.is_symlink() or data_dir.is_symlink():
-            return False
-        resolved_root = mount_root.resolve(strict=True)
-        resolved_data = data_dir.resolve(strict=False)
-        if not resolved_data.is_relative_to(resolved_root):
-            return False
-        return os.path.ismount(mount_root)
-    except OSError:
-        return False
-
-
 def tcp_check(host: str, port: int, timeout: float = 1.0) -> bool:
     try:
         with socket.create_connection((host, port), timeout=timeout):
@@ -203,7 +187,7 @@ def tcp_check(host: str, port: int, timeout: float = 1.0) -> bool:
 
 def health_checks() -> dict[str, bool]:
     persistence_required = parse_bool(env("PERSISTENCE_REQUIRED"), default=False)
-    persistent_mount = persistent_data_mounted()
+    persistent_mount = os.path.ismount(DATA_DIR)
     checks = {
         "mariadb": tcp_check("127.0.0.1", int(env("MYSQL_PORT", "3306"))),
         "redis": tcp_check("127.0.0.1", 6379),

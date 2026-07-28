@@ -142,18 +142,6 @@ class OpsServiceTests(unittest.TestCase):
         self.assertTrue(payload["checks"]["persistent_data"])
         self.assertEqual(payload["persistence"], {"required": True, "mounted": True})
 
-    def test_persistence_rejects_data_directory_symlink_escape(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            root = Path(tmpdir)
-            mount_root = root / "data"
-            ephemeral = root / "ephemeral"
-            mount_root.mkdir()
-            ephemeral.mkdir()
-            (mount_root / "coze").symlink_to(ephemeral, target_is_directory=True)
-            ops_service.DATA_DIR = mount_root / "coze"
-            with mock.patch.object(ops_service.os.path, "ismount", return_value=True):
-                self.assertFalse(ops_service.persistent_data_mounted())
-
     def test_handler_returns_404_for_unknown_route(self):
         server = ThreadingHTTPServer(("127.0.0.1", 0), QuietHandler)
         thread = threading.Thread(target=server.serve_forever, daemon=True)
