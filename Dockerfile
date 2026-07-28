@@ -154,6 +154,7 @@ RUN set -eux; \
     getent group cozeadmin >/dev/null || groupadd --system cozeadmin; \
     id -u cozeadmin >/dev/null 2>&1 || useradd --system --gid cozeadmin --home-dir /nonexistent --shell /bin/false cozeadmin; \
     mkdir -p \
+      /app \
       /bitnami/elasticsearch/data \
       /bitnami/etcd \
       /data/coze \
