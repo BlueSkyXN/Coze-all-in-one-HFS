@@ -5,7 +5,8 @@
 ## Contract
 
 - Pattern A: HFS Port Repository
-- HFS v2 registry: `hfs-dev.toml` (`standard = "2.0"`)
+- HFS v2.1 registry: `hfs-dev.toml` (`standard = "2.1"`)
+- Project class: `preview`; canonical target role: `primary`
 - Delivery lane: `artifact` registry with a hybrid implementation
 - Space root: repo root
 - Public port: `7860`
@@ -14,6 +15,8 @@
 仓库根目录同时是 GitHub 维护根和 Hugging Face Space root。reviewable wrapper 包含 `Dockerfile`、`hfs/`、docs 和 local gates；Space build context 不包含产品源码、`.env*`、`local/`、cache、generated data 或 credentials。
 
 `hfs-dev.toml` 只登记 HFS v2 的项目关系、车道和 Setting 键名。上游 ref、镜像 digest、checksum、bootstrap 和 runtime invariants 的事实源仍是 `Dockerfile`、`hfs/bin/bootstrap_runtime.py` 与构建 workflow；不要把它们复制到 manifest 形成第二份 pin 表。
+
+Preview 日常变更可以直接更新 canonical Space，再做 readback 和 smoke。任何 Secret 都必须先写入被忽略的本机明文 `.env`；远端值只是部署副本，无法反向读回。`hfs-dev.candidate.toml` 仅用于高风险可选验证，不是常规前置，其独立账本为 `local/hfs-targets/candidate.env`。
 
 ## Hybrid Runtime Boundary
 
@@ -38,7 +41,7 @@ Coze server 与 web 是不可变 runtime artifacts。启动时 `bootstrap_runtim
 - `release`：必须 `confirmed=true` 与 `release_tag`，将已验证运行时集合存为 GitHub Release 历史归档并 readback。
 - `promote-release`：必须 `confirmed=true`，从 GitHub Release 重新下载并验证后，按 artifact-first / readback / manifest-last 写入 `release/`。
 
-槽位约定为 `hfs-dist/coze-all-in-one-hfs/{edge,release}`。artifact 文件名包含完整 source commit；`manifest.json` 是唯一选择器。观察期和明确 owner gate 之后才可删除不再引用的槽位对象；本轮不执行上传、promote、Space 更新或清理。
+槽位约定为 `hfs-dist/coze-all-in-one-hfs/{edge,release}`。artifact 文件名包含完整 source commit；`manifest.json` 是唯一选择器。观察期和明确 owner gate 之后才可删除不再引用的槽位对象。artifact promotion 仍是独立发布控制，不构成 Preview 修改 canonical Space 的常规前置。
 
 ## Retained Infrastructure Deviations
 

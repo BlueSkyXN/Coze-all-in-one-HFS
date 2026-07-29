@@ -87,22 +87,32 @@ root = Path(sys.argv[1])
 manifest = tomllib.loads((root / "hfs-dev.toml").read_text(encoding="utf-8"))
 candidate = tomllib.loads((root / "hfs-dev.candidate.toml").read_text(encoding="utf-8"))
 expected = {
-    "standard": "2.0",
+    "standard": "2.1",
     "project": "coze-all-in-one-hfs",
     "space": "BlueSkyXN/Coze-all-in-one-HFS",
     "sovereignty": "port",
     "lane": "artifact",
     "version_source": "commit",
+    "project_class": "preview",
+    "target_role": "primary",
+    "env_file": ".env",
+    "secret_files": [],
     "dist_bucket": "hfs-dist",
 }
 required_secrets = {"COZE_RUNTIME_DOWNLOAD_TOKEN", "OPS_TOKEN", "ADMIN_TOKEN"}
 required_variables = {"COZE_RUNTIME_MANIFEST_URI", "PERSISTENCE_REQUIRED", "CODE_RUNNER_TYPE", "MODEL_PROTOCOL_0", "S3_ENDPOINT"}
 failures: list[str] = []
-if candidate.get("space") != "BlueSkyXN/Coze-all-in-one-HFS-v2-candidate":
-    failures.append("candidate manifest must target BlueSkyXN/Coze-all-in-one-HFS-v2-candidate")
-for key in ("standard", "project", "sovereignty", "lane", "version_source", "local_only", "secrets", "variables", "dist_bucket", "seed_file", "other_objects", "deviations"):
+candidate_expected = {
+    "space": "BlueSkyXN/Coze-all-in-one-HFS-v2-candidate",
+    "target_role": "candidate",
+    "env_file": "local/hfs-targets/candidate.env",
+}
+for key, value in candidate_expected.items():
+    if candidate.get(key) != value:
+        failures.append(f"candidate manifest {key} must be {value!r}")
+for key in ("standard", "project", "sovereignty", "lane", "version_source", "project_class", "secret_files", "local_only", "secrets", "variables", "dist_bucket", "seed_file", "other_objects", "deviations"):
     if candidate.get(key) != manifest.get(key):
-        failures.append(f"candidate manifest {key} must match production manifest")
+        failures.append(f"candidate manifest {key} must match canonical preview manifest")
 for key, value in expected.items():
     if manifest.get(key) != value:
         failures.append(f"hfs-dev.toml {key} must be {value!r}, got {manifest.get(key)!r}")

@@ -118,7 +118,7 @@ ADMIN_TOKEN=
 
 ## ENV 管理
 
-公开说明见 [docs/env-reference.md](docs/env-reference.md)。本机部署值记录在 gitignored `.env`（从无密 `.env.example` 开始）；遗留 `.env.local` 同样保持忽略，不会进入 GitHub、Hugging Face 或 Docker build context。同步顺序固定为本地改值 → diff → 经批准 push → readback，不在网页直接留下未回收的配置。
+公开说明见 [docs/env-reference.md](docs/env-reference.md)。本机部署值记录在 gitignored 明文 `.env`（从无密 `.env.example` 开始）；遗留 `.env.local` 同样保持忽略，不会进入 GitHub、Hugging Face 或 Docker build context。本项目是 Preview，canonical Space 可直接修改；同步顺序固定为本地改值 → diff → push → readback，Secret 不允许只留在无法读回的远端。
 
 首次切换到 artifact runtime 前，Space Variable 必须设置无凭据的直接 HTTPS `COZE_RUNTIME_MANIFEST_URI`；private `hfs-dist` 如需认证，另以 Space Secret 提供 `COZE_RUNTIME_DOWNLOAD_TOKEN`。两者均需由发布 workflow 的 artifact/readback/manifest-last 证据支撑，不能填入 URL query 或从旧镜像回退。
 

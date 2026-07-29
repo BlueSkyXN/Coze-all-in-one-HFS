@@ -73,7 +73,7 @@ done
 grep -q '^sdk: docker$' README.md
 grep -q '^app_port: 7860$' README.md
 grep -q '^EXPOSE 7860$' Dockerfile
-grep -q '^standard = "2.0"$' hfs-dev.toml
+grep -q '^standard = "2.1"$' hfs-dev.toml
 grep -q '^lane = "artifact"$' hfs-dev.toml
 grep -q '/_admin/' hfs/conf/nginx.conf
 
