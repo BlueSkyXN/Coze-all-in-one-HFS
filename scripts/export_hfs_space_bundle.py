@@ -281,16 +281,31 @@ def validate_dockerfile_sources(dockerfile: str, files: set[str]) -> None:
                 raise BundleError(f"Dockerfile local source is absent from the allowlist: {source}")
 
 
-def expected_source_entries(bundle: Path, config: dict[str, Any], profile: dict[str, Any]) -> list[dict[str, Any]]:
-    mapping = list(config["source_to_bundle"].items()) + [(profile["manifest"], PROFILE_PATH)]
+def source_mapping(config: dict[str, Any], profile: dict[str, Any]) -> list[tuple[str, str]]:
+    return list(config["source_to_bundle"].items()) + [(profile["manifest"], PROFILE_PATH)]
+
+
+def bundle_source_entries(bundle: Path, config: dict[str, Any], profile: dict[str, Any]) -> list[dict[str, Any]]:
     entries = []
-    for source_path, bundle_path in mapping:
+    for source_path, bundle_path in source_mapping(config, profile):
         path = bundle / bundle_path
         mode = stat.S_IMODE(path.stat().st_mode)
         if mode not in {0o644, 0o755}:
             raise BundleError(f"bundle file has an unsupported mode: {bundle_path}")
         entries.append(source_entry(source_path, bundle_path, path.read_bytes(), mode))
     return entries
+
+
+def git_source_entries(source_commit: str, config: dict[str, Any], profile: dict[str, Any]) -> list[dict[str, Any]]:
+    return [
+        source_entry(
+            source_path,
+            bundle_path,
+            blob(source_commit, source_path),
+            tree_mode(source_commit, source_path),
+        )
+        for source_path, bundle_path in source_mapping(config, profile)
+    ]
 
 
 def verify_bundle(bundle: Path, profile_name: str) -> None:
@@ -351,8 +366,12 @@ def verify_bundle(bundle: Path, profile_name: str) -> None:
         or evidence.get("runtime_source_commit") != runtime_source_commit(dockerfile)
     ):
         raise BundleError("BUILD_SOURCE.json does not match the immutable Coze runtime source")
-    if evidence.get("source_files") != expected_source_entries(bundle, config, profile):
-        raise BundleError("BUILD_SOURCE.json source file inventory does not match bundle bytes and modes")
+    source_commit = str(evidence["wrapper_source_commit"])
+    committed_entries = git_source_entries(source_commit, config, profile)
+    if evidence.get("source_files") != committed_entries:
+        raise BundleError("BUILD_SOURCE.json source file inventory does not match the wrapper source commit")
+    if bundle_source_entries(bundle, config, profile) != committed_entries:
+        raise BundleError("bundle source files do not match the wrapper source commit bytes and modes")
 
     for relative in sorted(files - {"SHA256SUMS"}):
         try:
