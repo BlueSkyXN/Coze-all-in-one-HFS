@@ -50,6 +50,7 @@ required_files=(
   hfs-dev.toml
   hfs-dev.candidate.toml
   hfs-space-bundle.json
+  examples/hfs-variables.env.example
   .env.example
   AGENTS.md
   hfs/AGENTS.md
@@ -62,6 +63,7 @@ required_files=(
   hfs/conf/nginx.conf
   hfs/conf/supervisord.conf
   hfs/tests/test_bootstrap_runtime.py
+  hfs/tests/test_render_env.py
   scripts/verify-runtime-artifacts.py
   scripts/export_hfs_space_bundle.py
   .github/workflows/deploy-hfs-formal.yml
@@ -82,6 +84,7 @@ require_grep 'tar --dereference --hard-dereference --sort=name' .github/workflow
 python3 - "$repo_root" <<'PY'
 from __future__ import annotations
 
+import re
 import sys
 import tomllib
 from pathlib import Path
@@ -113,7 +116,24 @@ optional_secrets = {
     "TOS_ACCESS_KEY",
     "TOS_SECRET_KEY",
 }
-required_variables = {"COZE_RUNTIME_MANIFEST_URI", "PERSISTENCE_REQUIRED", "CODE_RUNNER_TYPE", "MODEL_PROTOCOL_0", "S3_ENDPOINT"}
+required_variables = {"COZE_RUNTIME_MANIFEST_URI", "PERSISTENCE_REQUIRED", "CODE_RUNNER_TYPE"}
+excluded_clean_variables = {
+    "ALLOW_REGISTRATION_EMAIL",
+    "MODEL_PROTOCOL_0",
+    "MODEL_OPENCOZE_ID_0",
+    "MODEL_NAME_0",
+    "MODEL_ID_0",
+    "MODEL_BASE_URL_0",
+    "BUILTIN_CM_TYPE",
+    "BUILTIN_CM_OPENAI_BASE_URL",
+    "BUILTIN_CM_OPENAI_MODEL",
+    "S3_ENDPOINT",
+    "S3_BUCKET_ENDPOINT",
+    "S3_REGION",
+    "VIKING_DB_HOST",
+    "VIKING_DB_REGION",
+    "VIKING_DB_SCHEME",
+}
 failures: list[str] = []
 if candidate.get("space") != "BlueSkyXN/Coze-all-in-one-HFS-v2-candidate":
     failures.append("candidate manifest must target BlueSkyXN/Coze-all-in-one-HFS-v2-candidate")
@@ -139,6 +159,23 @@ if configured_optional_secrets != optional_secrets:
     failures.append("hfs-dev.toml optional_secrets must register admin and external provider credentials")
 if not required_variables <= variables:
     failures.append("hfs-dev.toml variables must register runtime manifest and policy names")
+unexpected_clean_variables = sorted(excluded_clean_variables & variables)
+if unexpected_clean_variables:
+    failures.append(
+        "clean no-paid manifests must not register variables without safe nonempty values: "
+        + ", ".join(unexpected_clean_variables)
+    )
+example = (root / "examples/hfs-variables.env.example").read_text(encoding="utf-8")
+example_keys = {
+    match.group(1)
+    for match in re.finditer(r"(?m)^\s*#?\s*([A-Z][A-Z0-9_]*)=", example)
+}
+unexpected_example_variables = sorted(excluded_clean_variables & example_keys)
+if unexpected_example_variables:
+    failures.append(
+        "clean no-paid example must not include optional provider or external-service variables: "
+        + ", ".join(unexpected_example_variables)
+    )
 classified = {
     "local_only": set(manifest.get("local_only", [])),
     "secrets": secrets,
@@ -247,6 +284,11 @@ require_grep 'tokens are not accepted in URLs' hfs/bin/ops_service.py "ops dashb
 require_grep 'runtime_provenance' hfs/bin/ops_service.py "ops version payload must expose safe runtime provenance"
 require_grep 'runtime_provenance.*runtime_provenance_payload' hfs/bin/ops_service.py "canonical health must require bootstrap provenance"
 require_grep 'emit CODE_RUNNER_TYPE "sandbox"' hfs/bin/render-env.sh "Coze must explicitly use the sandbox code runner"
+require_grep 'emit ENABLE_LOCAL_MINIO "1"' hfs/bin/render-env.sh "clean no-paid profile must default to local MinIO"
+require_grep 'emit STORAGE_TYPE "minio"' hfs/bin/render-env.sh "clean no-paid profile must use local MinIO storage"
+require_grep 'emit MINIO_ADDRESS "127\.0\.0\.1:9000"' hfs/bin/render-env.sh "clean no-paid profile must point Milvus at local MinIO"
+require_grep 'emit ES_ADDR "http://127\.0\.0\.1:9200"' hfs/bin/render-env.sh "clean no-paid profile must default to local Elasticsearch"
+require_grep 'emit VECTOR_STORE_TYPE "milvus"' hfs/bin/render-env.sh "clean no-paid profile must default to local Milvus"
 require_grep 'RUN_DIR="\$\{RUN_DIR:-/run/coze\}"' hfs/bin/mysql-init.sh "mysql sockets must stay off the data volume"
 require_grep '^file=/run/coze/supervisor\.sock' hfs/conf/supervisord.conf "supervisor socket must stay off the data volume"
 require_grep '^pid /run/coze/nginx\.pid;' hfs/conf/nginx.conf "nginx pid must stay off the data volume"

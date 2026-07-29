@@ -133,21 +133,12 @@ PERSISTENCE_REQUIRED=true
 OPS_TOKEN=<fixed-random-token>
 ```
 
-文本 Agent 测试通常还需要模型配置。含 token/key/password 的值必须放 HF Secrets：
+这组设置就是 clean no-paid profile。未提供外部 provider、S3 或 VikingDB 配置时，
+`render-env.sh` 会继续使用本地 MinIO、Elasticsearch 和 Milvus，模型/provider tuple 不会形成可用配置；
+因此页面、健康检查和本地基础服务可以启动，但模型相关业务能力不会在没有显式 provider 配置时可用。
 
-```bash
-MODEL_PROTOCOL_0=openai
-MODEL_OPENCOZE_ID_0=100001
-MODEL_NAME_0=your-model-display-name
-MODEL_ID_0=your-model-id
-MODEL_BASE_URL_0=https://your-openai-compatible-endpoint/v1
-MODEL_API_KEY_0=sk-...
-
-BUILTIN_CM_TYPE=openai
-BUILTIN_CM_OPENAI_BASE_URL=https://your-openai-compatible-endpoint/v1
-BUILTIN_CM_OPENAI_API_KEY=sk-...
-BUILTIN_CM_OPENAI_MODEL=your-model-id
-```
+文本 Agent 测试需要另行建立完整的 provider-enabled 配置，不能在 clean profile 中同步空值或占位值。
+配置前先按 [docs/env-reference.md](docs/env-reference.md) 核对完整字段；token、key、password 和私有 endpoint 必须放 HF Secrets。
 
 ## 持久化
 

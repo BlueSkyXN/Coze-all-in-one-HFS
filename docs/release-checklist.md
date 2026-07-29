@@ -42,6 +42,8 @@ git diff --check
 - Optional HF Secrets：按需开启时的 `ADMIN_TOKEN` / `ADMIN_CSRF_KEY`、模型、Embedding、S3、ES、Vector、OCR、rerank、第三方 API 的 token/key/password。clean non-paid profile 留空；同步时不视为缺失，prune 仍保留登记过的远端可选键。
 - 平台注入项：`SPACE_HOST`、`SPACE_ID` 等不要手动配置。
 
+clean no-paid profile 不登记没有安全非空值的注册 allowlist、模型/provider tuple、外部 S3 endpoint/region 或外部 VikingDB endpoint/region/scheme Variables；不要用空值、个人信息或占位 endpoint 填充 Settings。未配置这些扩展项时，runtime defaults 保持本地 MinIO、Elasticsearch 与 Milvus 路径，模型/provider tuple 不会形成可用配置。
+
 `ENABLE_LOCAL_MINIO=0` 只适合已经提供外部 object storage 的场景。只要继续使用内置 Milvus，就必须保证 `MINIO_ADDRESS` 指向一个 Milvus 可访问的对象存储 endpoint，并提前准备好 `MINIO_BUCKET_NAME` 对应 bucket。
 
 如果 `/data/coze` 已挂载 read-write HF bucket volume，同时设置 `PERSISTENCE_REQUIRED=true`。此后 canonical health 会把 mount 丢失视为 503，避免在 overlay filesystem 上静默启动并误报持久化正常。线上 smoke 使用 `SMOKE_PERSISTENCE_REQUIRED=true` 回读该门禁。
