@@ -230,6 +230,7 @@ require_grep 'FORMAL_SPACE: BlueSkyXN/Coze-all-in-one-HFS' .github/workflows/dep
 require_grep 'environment: hfs-production' .github/workflows/deploy-hfs-formal.yml "formal workflow must use the scoped production environment"
 require_grep 'PUBLISH_FORMAL' .github/workflows/deploy-hfs-formal.yml "formal workflow must require exact upload confirmation"
 require_grep 'export_hfs_space_bundle\.py export' .github/workflows/deploy-hfs-formal.yml "formal workflow must use the strict exporter"
+require_grep "source-commit \"\\\$SOURCE_REF\"" .github/workflows/deploy-hfs-formal.yml "formal workflow must authorize every verifier against the locked source commit"
 require_grep 'canonical repository path readback does not match' .github/workflows/deploy-hfs-formal.yml "formal workflow must enforce complete path readback"
 require_grep 'HF_CLI_CLICK_VERSION: "8\.3\.1"' .github/workflows/deploy-hfs-formal.yml "formal workflow must pin click 8.3.1"
 require_grep 'click==\$\{HF_CLI_CLICK_VERSION\}' .github/workflows/deploy-hfs-formal.yml "formal workflow must install click explicitly"

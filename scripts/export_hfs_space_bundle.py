@@ -97,12 +97,20 @@ def _git(*args: str, text: bool = True) -> str | bytes:
     return result.stdout
 
 
-def require_source_commit(source_commit: str) -> None:
+def require_commit_object(source_commit: str) -> None:
     if not LOWER_SHA.fullmatch(source_commit):
         raise BundleError("--source-commit must be a full lowercase Git SHA")
+    object_type = str(_git("cat-file", "-t", source_commit)).strip()
+    if object_type != "commit":
+        raise BundleError(
+            f"--source-commit must identify a Git commit; got object type {object_type or 'unknown'}"
+        )
+
+
+def require_source_commit(source_commit: str) -> None:
+    require_commit_object(source_commit)
     if str(_git("rev-parse", "HEAD")).strip() != source_commit:
         raise BundleError("source commit must equal checkout HEAD")
-    _git("cat-file", "-e", f"{source_commit}^{{commit}}")
     if str(_git("status", "--porcelain=v1", "--untracked-files=all")):
         raise BundleError("refusing to export a dirty checkout")
 
@@ -210,7 +218,7 @@ def export_bundle(source_commit: str, profile_name: str, output: Path) -> None:
         (json.dumps(evidence, indent=2, sort_keys=True) + "\n").encode("utf-8"),
     )
     write_checksums(output, expected_paths(config))
-    verify_bundle(output, profile_name)
+    verify_bundle(output, profile_name, source_commit)
 
 
 def inventory(bundle: Path) -> tuple[set[str], set[str]]:
@@ -308,7 +316,8 @@ def git_source_entries(source_commit: str, config: dict[str, Any], profile: dict
     ]
 
 
-def verify_bundle(bundle: Path, profile_name: str) -> None:
+def verify_bundle(bundle: Path, profile_name: str, source_commit: str) -> None:
+    require_commit_object(source_commit)
     config = load_config()
     profile = config["profiles"].get(profile_name)
     if not isinstance(profile, dict):
@@ -360,13 +369,16 @@ def verify_bundle(bundle: Path, profile_name: str) -> None:
         or evidence.get("profile") != profile_name
     ):
         raise BundleError("BUILD_SOURCE.json does not match the fixed release profile")
+    if evidence.get("wrapper_source_commit") != source_commit:
+        raise BundleError(
+            "BUILD_SOURCE.json wrapper source commit does not match authorized source commit"
+        )
     dockerfile = (bundle / "Dockerfile").read_text(encoding="utf-8")
     if (
         evidence.get("runtime_source_repository") != RUNTIME_SOURCE_REPOSITORY
         or evidence.get("runtime_source_commit") != runtime_source_commit(dockerfile)
     ):
         raise BundleError("BUILD_SOURCE.json does not match the immutable Coze runtime source")
-    source_commit = str(evidence["wrapper_source_commit"])
     committed_entries = git_source_entries(source_commit, config, profile)
     if evidence.get("source_files") != committed_entries:
         raise BundleError("BUILD_SOURCE.json source file inventory does not match the wrapper source commit")
@@ -393,6 +405,7 @@ def parser() -> argparse.ArgumentParser:
     export.add_argument("--profile", required=True)
     export.add_argument("--output", type=Path, required=True)
     verify = commands.add_parser("verify")
+    verify.add_argument("--source-commit", required=True)
     verify.add_argument("--profile", required=True)
     verify.add_argument("--bundle", type=Path, required=True)
     paths = commands.add_parser("paths")
@@ -407,7 +420,7 @@ def main() -> int:
             export_bundle(args.source_commit, args.profile, args.output)
             print(f"Exported verified {args.profile} HFS bundle: {args.output}")
         elif args.command == "verify":
-            verify_bundle(args.bundle, args.profile)
+            verify_bundle(args.bundle, args.profile, args.source_commit)
             print(f"Verified {args.profile} HFS bundle: {args.bundle}")
         else:
             config = load_config()
