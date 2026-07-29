@@ -265,7 +265,7 @@ class WorkflowContractTests(unittest.TestCase):
         workflow = FORMAL_WORKFLOW.read_text(encoding="utf-8")
         for required in (
             'HF_CLI_VERSION: "1.5.0"',
-            'HF_CLI_CLICK_VERSION: "8.3.1"',
+            'HF_CLI_CLICK_VERSION: "8.3.3"',
             "huggingface_hub==${HF_CLI_VERSION}",
             "click==${HF_CLI_CLICK_VERSION}",
             "python3 -m huggingface_hub.cli.hf --help",
@@ -286,7 +286,7 @@ class WorkflowContractTests(unittest.TestCase):
         workflow = PRODUCER_WORKFLOW.read_text(encoding="utf-8")
         for required in (
             "huggingface_hub==1.5.0",
-            "click==8.3.1",
+            "click==8.3.3",
             "python3 -m huggingface_hub.cli.hf version",
             "python3 -m huggingface_hub.cli.hf buckets cp",
         ):
