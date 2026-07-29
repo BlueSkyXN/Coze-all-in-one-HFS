@@ -15,6 +15,8 @@ local_only = ["HF_TOKEN", "GH_TOKEN"]
 secrets = [
   "COZE_RUNTIME_DOWNLOAD_TOKEN",
   "OPS_TOKEN",
+]
+optional_secrets = [
   "ADMIN_TOKEN",
   "ADMIN_CSRF_KEY",
   "MODEL_API_KEY_0",
