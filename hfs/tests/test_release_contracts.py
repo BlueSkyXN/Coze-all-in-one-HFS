@@ -303,6 +303,7 @@ class WorkflowContractTests(unittest.TestCase):
         )
         self.assertIsNotNone(checkout)
         assert checkout is not None
+        self.assertIn("persist-credentials: false", release_archive)
         self.assertLess(checkout.start(), release_archive.index("gh release create"))
 
     def test_release_promotion_binds_release_target_to_build_source(self) -> None:
