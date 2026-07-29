@@ -292,6 +292,19 @@ class WorkflowContractTests(unittest.TestCase):
         ):
             self.assertIn(required, workflow)
 
+    def test_release_archive_checks_out_wrapper_repository_before_using_gh(self) -> None:
+        workflow = PRODUCER_WORKFLOW.read_text(encoding="utf-8")
+        release_archive = workflow.split("  release-archive:", 1)[1].split(
+            "\n  promote-release:", 1
+        )[0]
+        checkout = re.search(
+            r"(?m)^\s+- uses: actions/checkout@[0-9a-f]{40}",
+            release_archive,
+        )
+        self.assertIsNotNone(checkout)
+        assert checkout is not None
+        self.assertLess(checkout.start(), release_archive.index("gh release create"))
+
     def test_release_promotion_binds_release_target_to_build_source(self) -> None:
         workflow = PRODUCER_WORKFLOW.read_text(encoding="utf-8")
         promotion = workflow.split("  promote-release:", 1)[1]
