@@ -38,7 +38,8 @@ git diff --check
 `.env.local` 是唯一的本机私有记录，不提交、不上传、不写入公开 docs。发布前只核对 key 分类：
 
 - HF Variables：非敏感运行策略，如 `DISABLE_USER_REGISTRATION`、`ENABLE_LOCAL_MINIO`、`COZE_PUBLIC_URL`。
-- HF Secrets：`OPS_TOKEN`、按需开启时的 `ADMIN_TOKEN` / `ADMIN_CSRF_KEY`、模型、Embedding、S3、ES、Vector、OCR、rerank、第三方 API 的 token/key/password。
+- Required HF Secrets：`COZE_RUNTIME_DOWNLOAD_TOKEN`、`OPS_TOKEN`。
+- Optional HF Secrets：按需开启时的 `ADMIN_TOKEN` / `ADMIN_CSRF_KEY`、模型、Embedding、S3、ES、Vector、OCR、rerank、第三方 API 的 token/key/password。clean non-paid profile 留空；同步时不视为缺失，prune 仍保留登记过的远端可选键。
 - 平台注入项：`SPACE_HOST`、`SPACE_ID` 等不要手动配置。
 
 `ENABLE_LOCAL_MINIO=0` 只适合已经提供外部 object storage 的场景。只要继续使用内置 Milvus，就必须保证 `MINIO_ADDRESS` 指向一个 Milvus 可访问的对象存储 endpoint，并提前准备好 `MINIO_BUCKET_NAME` 对应 bucket。

@@ -60,6 +60,9 @@ required=(
   scripts/admin-smoke.sh
   scripts/validate-hfs-contract.sh
   scripts/verify-runtime-artifacts.py
+  scripts/export_hfs_space_bundle.py
+  hfs-space-bundle.json
+  .github/workflows/deploy-hfs-formal.yml
   .env.example
 )
 
@@ -94,6 +97,7 @@ sources = [
     Path("hfs/bin/ops_service.py"),
     Path("hfs/bin/admin_service.py"),
     Path("scripts/verify-runtime-artifacts.py"),
+    Path("scripts/export_hfs_space_bundle.py"),
 ]
 with tempfile.TemporaryDirectory() as directory:
     for source in sources:

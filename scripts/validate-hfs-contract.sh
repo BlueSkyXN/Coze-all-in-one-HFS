@@ -49,6 +49,7 @@ required_files=(
   Dockerfile
   hfs-dev.toml
   hfs-dev.candidate.toml
+  hfs-space-bundle.json
   .env.example
   AGENTS.md
   hfs/AGENTS.md
@@ -62,6 +63,8 @@ required_files=(
   hfs/conf/supervisord.conf
   hfs/tests/test_bootstrap_runtime.py
   scripts/verify-runtime-artifacts.py
+  scripts/export_hfs_space_bundle.py
+  .github/workflows/deploy-hfs-formal.yml
   scripts/admin-smoke.sh
   scripts/hf-space-smoke.sh
   scripts/static-check.sh
@@ -95,12 +98,26 @@ expected = {
     "version_source": "commit",
     "dist_bucket": "hfs-dist",
 }
-required_secrets = {"COZE_RUNTIME_DOWNLOAD_TOKEN", "OPS_TOKEN", "ADMIN_TOKEN"}
+required_secrets = {"COZE_RUNTIME_DOWNLOAD_TOKEN", "OPS_TOKEN"}
+optional_secrets = {
+    "ADMIN_TOKEN",
+    "ADMIN_CSRF_KEY",
+    "MODEL_API_KEY_0",
+    "BUILTIN_CM_OPENAI_API_KEY",
+    "OPENAI_EMBEDDING_API_KEY",
+    "S3_ACCESS_KEY",
+    "S3_SECRET_KEY",
+    "ES_PASSWORD",
+    "VIKING_DB_AK",
+    "VIKING_DB_SK",
+    "TOS_ACCESS_KEY",
+    "TOS_SECRET_KEY",
+}
 required_variables = {"COZE_RUNTIME_MANIFEST_URI", "PERSISTENCE_REQUIRED", "CODE_RUNNER_TYPE", "MODEL_PROTOCOL_0", "S3_ENDPOINT"}
 failures: list[str] = []
 if candidate.get("space") != "BlueSkyXN/Coze-all-in-one-HFS-v2-candidate":
     failures.append("candidate manifest must target BlueSkyXN/Coze-all-in-one-HFS-v2-candidate")
-for key in ("standard", "project", "sovereignty", "lane", "version_source", "local_only", "secrets", "variables", "dist_bucket", "seed_file", "other_objects", "deviations"):
+for key in ("standard", "project", "sovereignty", "lane", "version_source", "local_only", "secrets", "optional_secrets", "variables", "dist_bucket", "seed_file", "other_objects", "deviations"):
     if candidate.get(key) != manifest.get(key):
         failures.append(f"candidate manifest {key} must match production manifest")
 for key, value in expected.items():
@@ -109,18 +126,35 @@ for key, value in expected.items():
 for legacy in ("schema_version", "pattern", "runtime_mode", "release_pins", "required_files"):
     if legacy in manifest:
         failures.append(f"hfs-dev.toml must not keep legacy field: {legacy}")
-for field in ("local_only", "secrets", "variables", "deviations"):
+for field in ("local_only", "secrets", "optional_secrets", "variables", "deviations"):
     value = manifest.get(field)
     if not isinstance(value, list) or not value or not all(isinstance(item, str) and item for item in value):
         failures.append(f"hfs-dev.toml {field} must be a non-empty string array")
 secrets = set(manifest.get("secrets", []))
+configured_optional_secrets = set(manifest.get("optional_secrets", []))
 variables = set(manifest.get("variables", []))
-if not required_secrets <= secrets:
-    failures.append("hfs-dev.toml secrets must register runtime download and ops/admin token names")
+if secrets != required_secrets:
+    failures.append("hfs-dev.toml secrets must register exactly the required runtime download and ops token names")
+if configured_optional_secrets != optional_secrets:
+    failures.append("hfs-dev.toml optional_secrets must register admin and external provider credentials")
 if not required_variables <= variables:
     failures.append("hfs-dev.toml variables must register runtime manifest and policy names")
-if secrets & variables:
-    failures.append("hfs-dev.toml secrets and variables must not overlap")
+classified = {
+    "local_only": set(manifest.get("local_only", [])),
+    "secrets": secrets,
+    "optional_secrets": configured_optional_secrets,
+    "variables": variables,
+}
+for left, right in (
+    ("local_only", "secrets"),
+    ("local_only", "optional_secrets"),
+    ("local_only", "variables"),
+    ("secrets", "optional_secrets"),
+    ("secrets", "variables"),
+    ("optional_secrets", "variables"),
+):
+    if classified[left] & classified[right]:
+        failures.append(f"hfs-dev.toml {left} and {right} must not overlap")
 if not any(entry.startswith("hybrid-wrapper =") for entry in manifest.get("deviations", [])):
     failures.append("hfs-dev.toml must document the hybrid wrapper deviation")
 if not any(entry.startswith("business-image =") for entry in manifest.get("deviations", [])):
@@ -182,12 +216,22 @@ require_grep 'confirmed' .github/workflows/build-pinned-coze.yml "artifact workf
 require_grep 'readback' .github/workflows/build-pinned-coze.yml "artifact workflow must perform post-write readback"
 require_grep 'BUILD_SOURCE-\$\{UPSTREAM_REF\}\.json' .github/workflows/build-pinned-coze.yml "artifact workflow must publish commit-named build provenance"
 require_grep 'targetCommitish' .github/workflows/build-pinned-coze.yml "release publication must read back its target commit"
+require_grep 'release target commit does not match BUILD_SOURCE wrapper_ref' .github/workflows/build-pinned-coze.yml "release promotion must bind target commit to archived provenance"
+require_grep 'GitHub Release asset inventory does not match the verified runtime set' .github/workflows/build-pinned-coze.yml "release promotion must reject incomplete or extra assets"
 require_grep 'verify-runtime-artifacts\.py' .github/workflows/build-pinned-coze.yml "artifact workflow must locally verify its output"
 require_grep 'actions/checkout@[0-9a-f]{40}' .github/workflows/build-pinned-coze.yml "artifact workflow must pin checkout by immutable revision"
 require_grep 'actions/upload-artifact@[0-9a-f]{40}' .github/workflows/build-pinned-coze.yml "artifact workflow must pin artifact upload by immutable revision"
 require_grep 'actions/download-artifact@[0-9a-f]{40}' .github/workflows/build-pinned-coze.yml "artifact workflow must pin artifact download by immutable revision"
 require_grep 'CANONICAL_SOURCE_COMMIT: 22275b1c2661d35344a7493cffe401e8cc61cf8e' .github/workflows/build-pinned-coze.yml "artifact workflow must bind server and web builds to the canonical Coze source commit"
 require_grep 'huggingface_hub==1\.5\.0' .github/workflows/build-pinned-coze.yml "artifact publish jobs must install a pinned Hugging Face CLI"
+require_grep 'FORMAL_SPACE: BlueSkyXN/Coze-all-in-one-HFS' .github/workflows/deploy-hfs-formal.yml "formal workflow must hard-code the canonical Space"
+require_grep 'environment: hfs-production' .github/workflows/deploy-hfs-formal.yml "formal workflow must use the scoped production environment"
+require_grep 'PUBLISH_FORMAL' .github/workflows/deploy-hfs-formal.yml "formal workflow must require exact upload confirmation"
+require_grep 'export_hfs_space_bundle\.py export' .github/workflows/deploy-hfs-formal.yml "formal workflow must use the strict exporter"
+require_grep 'canonical repository path readback does not match' .github/workflows/deploy-hfs-formal.yml "formal workflow must enforce complete path readback"
+require_grep 'python3 -m huggingface_hub\.cli\.hf --help' .github/workflows/deploy-hfs-formal.yml "formal workflow must exercise the pinned module CLI"
+require_grep 'revision=deployed_revision' .github/workflows/deploy-hfs-formal.yml "formal workflow must read back the immutable Space revision"
+require_grep 'runtime\.raw\.get\("sha"\) == deployed_revision' .github/workflows/deploy-hfs-formal.yml "formal workflow must bind the running Space to the uploaded revision"
 
 require_grep '/nginx-health' scripts/hf-space-smoke.sh "smoke must check /nginx-health"
 require_grep '/_ops/healthz' scripts/hf-space-smoke.sh "smoke must check /_ops/healthz"
