@@ -264,12 +264,13 @@ class WorkflowContractTests(unittest.TestCase):
     def test_formal_workflow_uses_immutable_readback_and_runtime_gate(self) -> None:
         workflow = FORMAL_WORKFLOW.read_text(encoding="utf-8")
         for required in (
-            'HF_CLI_VERSION: "1.5.0"',
-            'HF_CLI_CLICK_VERSION: "8.3.3"',
+            'HF_CLI_VERSION: "1.25.1"',
+            'HF_CLI_CLICK_VERSION: "8.4.2"',
             "huggingface_hub==${HF_CLI_VERSION}",
             "click==${HF_CLI_CLICK_VERSION}",
             "python3 -m huggingface_hub.cli.hf --help",
             "python3 -m huggingface_hub.cli.hf upload --help",
+            "python3 -m huggingface_hub.cli.hf repos settings --help | grep -- --protected",
             "deployed_revision = info.sha",
             "revision=deployed_revision",
             "hf_hub_download",
@@ -285,9 +286,10 @@ class WorkflowContractTests(unittest.TestCase):
     def test_artifact_workflow_pins_the_complete_module_cli_runtime(self) -> None:
         workflow = PRODUCER_WORKFLOW.read_text(encoding="utf-8")
         for required in (
-            "huggingface_hub==1.5.0",
-            "click==8.3.3",
+            "huggingface_hub==1.25.1",
+            "click==8.4.2",
             "python3 -m huggingface_hub.cli.hf version",
+            "python3 -m huggingface_hub.cli.hf repos settings --help | grep -- --protected",
             "python3 -m huggingface_hub.cli.hf buckets cp",
         ):
             self.assertIn(required, workflow)

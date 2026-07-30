@@ -142,8 +142,15 @@ def validate_manifest(payload: bytes, expected_space: str) -> None:
         manifest = tomllib.loads(payload.decode("utf-8"))
     except (UnicodeDecodeError, tomllib.TOMLDecodeError) as exc:
         raise BundleError("selected manifest is not valid UTF-8 TOML") from exc
-    if manifest.get("standard") != "2.0" or manifest.get("space") != expected_space:
-        raise BundleError("selected manifest does not identify HFS 2.0 and the fixed profile Space")
+    expected = {
+        "standard": "2.1",
+        "space": expected_space,
+        "project_class": "preview",
+        "space_visibility": "protected",
+        "bucket_visibility": "private",
+    }
+    if any(manifest.get(key) != value for key, value in expected.items()):
+        raise BundleError("selected manifest does not identify the HFS 2.1 Protected/Private fixed profile")
 
 
 def runtime_source_commit(dockerfile: str) -> str:

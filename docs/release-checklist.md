@@ -21,7 +21,7 @@ git diff --check
 
 ## 2. Hybrid Artifact Review
 
-先检查 `hfs-dev.toml` 是最小 HFS v2 registry：`standard="2.0"`、Pattern A `port`、artifact registry lane、Setting key names 和已登记 hybrid deviation。不要把 Docker ARG、artifact checksum 或 runtime invariant 复制回 registry。
+先检查 `hfs-dev.toml` 是最小 HFS v2.1 preview registry：`standard="2.1"`、`project_class="preview"`、`target_role="primary"`、Pattern A `port`、artifact registry lane、Setting key names 和已登记 hybrid deviation。不要把 Docker ARG、artifact checksum 或 runtime invariant 复制回 registry。
 
 每次 server/web artifact 发布必须满足：
 
@@ -35,7 +35,7 @@ git diff --check
 
 ## 3. Env Ledger
 
-`.env.local` 是唯一的本机私有记录，不提交、不上传、不写入公开 docs。发布前只核对 key 分类：
+`.env` 是 HFS 唯一的本机明文事实源，不提交、不上传、不写入公开 docs。Secret 必须先在该文件中落盘，再写入 Space；`.env.local` 只保留本地运行兼容。发布前只核对 key 分类：
 
 - HF Variables：非敏感运行策略，如 `DISABLE_USER_REGISTRATION`、`ENABLE_LOCAL_MINIO`、`COZE_PUBLIC_URL`。
 - Required HF Secrets：`COZE_RUNTIME_DOWNLOAD_TOKEN`、`OPS_TOKEN`。
@@ -50,7 +50,7 @@ clean no-paid profile 不登记没有安全非空值的注册 allowlist、模型
 
 ## 4. Controlled Remote Publication
 
-本轮只允许 GitHub Actions 的手动 workflow 执行 artifact publication；选择 `publish-edge`、`release` 或 `promote-release` 时必须填写 `confirmed=true`，并先取得 release/data owner 对 Space、`hfs-dist`、Settings 与维护窗口的批准。不得用 credential-bearing Git URL、whole-repo force-push、`hf upload --delete` 或网页临时修改替代流程。
+artifact publication 仍只允许 GitHub Actions 的手动 workflow；选择 `publish-edge`、`release` 或 `promote-release` 时必须填写 `confirmed=true`。本项目属于 Preview，wrapper 或 Settings 可直接更新 canonical Space，但 Secret 必须本地明文先行，并且写后必须 readback；candidate 只是高风险可选验证。仍禁止 credential-bearing Git URL、whole-repo force-push 和 `hf upload --delete`。
 
 发布后至少 read back：
 

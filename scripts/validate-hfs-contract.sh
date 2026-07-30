@@ -93,12 +93,18 @@ root = Path(sys.argv[1])
 manifest = tomllib.loads((root / "hfs-dev.toml").read_text(encoding="utf-8"))
 candidate = tomllib.loads((root / "hfs-dev.candidate.toml").read_text(encoding="utf-8"))
 expected = {
-    "standard": "2.0",
+    "standard": "2.1",
     "project": "coze-all-in-one-hfs",
     "space": "BlueSkyXN/Coze-all-in-one-HFS",
     "sovereignty": "port",
     "lane": "artifact",
     "version_source": "commit",
+    "project_class": "preview",
+    "target_role": "primary",
+    "space_visibility": "protected",
+    "bucket_visibility": "private",
+    "env_file": ".env",
+    "secret_files": [],
     "dist_bucket": "hfs-dist",
 }
 required_secrets = {"COZE_RUNTIME_DOWNLOAD_TOKEN", "OPS_TOKEN"}
@@ -135,11 +141,35 @@ excluded_clean_variables = {
     "VIKING_DB_SCHEME",
 }
 failures: list[str] = []
-if candidate.get("space") != "BlueSkyXN/Coze-all-in-one-HFS-v2-candidate":
-    failures.append("candidate manifest must target BlueSkyXN/Coze-all-in-one-HFS-v2-candidate")
-for key in ("standard", "project", "sovereignty", "lane", "version_source", "local_only", "secrets", "optional_secrets", "variables", "dist_bucket", "seed_file", "other_objects", "deviations"):
+candidate_expected = {
+    "space": "BlueSkyXN/Coze-all-in-one-HFS-v2-candidate",
+    "target_role": "candidate",
+    "env_file": "local/hfs-targets/candidate.env",
+}
+for key, value in candidate_expected.items():
+    if candidate.get(key) != value:
+        failures.append(f"candidate manifest {key} must be {value!r}")
+for key in (
+    "standard",
+    "project",
+    "sovereignty",
+    "lane",
+    "version_source",
+    "project_class",
+    "space_visibility",
+    "bucket_visibility",
+    "secret_files",
+    "local_only",
+    "secrets",
+    "optional_secrets",
+    "variables",
+    "dist_bucket",
+    "seed_file",
+    "other_objects",
+    "deviations",
+):
     if candidate.get(key) != manifest.get(key):
-        failures.append(f"candidate manifest {key} must match production manifest")
+        failures.append(f"candidate manifest {key} must match canonical preview manifest")
 for key, value in expected.items():
     if manifest.get(key) != value:
         failures.append(f"hfs-dev.toml {key} must be {value!r}, got {manifest.get(key)!r}")
@@ -260,18 +290,21 @@ require_grep 'actions/checkout@[0-9a-f]{40}' .github/workflows/build-pinned-coze
 require_grep 'actions/upload-artifact@[0-9a-f]{40}' .github/workflows/build-pinned-coze.yml "artifact workflow must pin artifact upload by immutable revision"
 require_grep 'actions/download-artifact@[0-9a-f]{40}' .github/workflows/build-pinned-coze.yml "artifact workflow must pin artifact download by immutable revision"
 require_grep 'CANONICAL_SOURCE_COMMIT: 22275b1c2661d35344a7493cffe401e8cc61cf8e' .github/workflows/build-pinned-coze.yml "artifact workflow must bind server and web builds to the canonical Coze source commit"
-require_grep 'huggingface_hub==1\.5\.0' .github/workflows/build-pinned-coze.yml "artifact publish jobs must install a pinned Hugging Face CLI"
-require_grep 'click==8\.3\.3' .github/workflows/build-pinned-coze.yml "artifact publish jobs must install the pinned direct CLI dependency"
+require_grep 'huggingface_hub==1\.25\.1' .github/workflows/build-pinned-coze.yml "artifact publish jobs must install the Protected-compatible Hugging Face CLI"
+require_grep 'click==8\.4\.2' .github/workflows/build-pinned-coze.yml "artifact publish jobs must install the pinned direct CLI dependency"
 require_grep 'python3 -m huggingface_hub\.cli\.hf version' .github/workflows/build-pinned-coze.yml "artifact publish jobs must exercise the module CLI"
+require_grep 'repos settings --help.*grep -- --protected' .github/workflows/build-pinned-coze.yml "artifact publish jobs must verify Protected visibility support"
 require_grep 'FORMAL_SPACE: BlueSkyXN/Coze-all-in-one-HFS' .github/workflows/deploy-hfs-formal.yml "formal workflow must hard-code the canonical Space"
 require_grep 'environment: hfs-production' .github/workflows/deploy-hfs-formal.yml "formal workflow must use the scoped production environment"
 require_grep 'PUBLISH_FORMAL' .github/workflows/deploy-hfs-formal.yml "formal workflow must require exact upload confirmation"
 require_grep 'export_hfs_space_bundle\.py export' .github/workflows/deploy-hfs-formal.yml "formal workflow must use the strict exporter"
 require_grep "source-commit \"\\\$SOURCE_REF\"" .github/workflows/deploy-hfs-formal.yml "formal workflow must authorize every verifier against the locked source commit"
 require_grep 'canonical repository path readback does not match' .github/workflows/deploy-hfs-formal.yml "formal workflow must enforce complete path readback"
-require_grep 'HF_CLI_CLICK_VERSION: "8\.3\.3"' .github/workflows/deploy-hfs-formal.yml "formal workflow must pin click 8.3.3"
+require_grep 'HF_CLI_VERSION: "1\.25\.1"' .github/workflows/deploy-hfs-formal.yml "formal workflow must pin Protected-compatible huggingface_hub 1.25.1"
+require_grep 'HF_CLI_CLICK_VERSION: "8\.4\.2"' .github/workflows/deploy-hfs-formal.yml "formal workflow must pin click 8.4.2"
 require_grep 'click==\$\{HF_CLI_CLICK_VERSION\}' .github/workflows/deploy-hfs-formal.yml "formal workflow must install click explicitly"
 require_grep 'python3 -m huggingface_hub\.cli\.hf --help' .github/workflows/deploy-hfs-formal.yml "formal workflow must exercise the pinned module CLI"
+require_grep 'repos settings --help.*grep -- --protected' .github/workflows/deploy-hfs-formal.yml "formal workflow must verify Protected visibility support"
 require_grep 'revision=deployed_revision' .github/workflows/deploy-hfs-formal.yml "formal workflow must read back the immutable Space revision"
 require_grep 'runtime\.raw\.get\("sha"\) == deployed_revision' .github/workflows/deploy-hfs-formal.yml "formal workflow must bind the running Space to the uploaded revision"
 
