@@ -108,7 +108,7 @@ ADMIN_TOKEN=$ADMIN_TOKEN \
 DISABLE_USER_REGISTRATION=true
 ```
 
-`ALLOW_REGISTRATION_EMAIL` 在 Coze `v0.5.1` fresh fallback config 中存在 upstream 读取缺陷，不能只凭 env 值声称 allowlist 已生效。受控测试可以设置：
+`ALLOW_REGISTRATION_EMAIL` 在 Coze `v0.5.1` fresh fallback config 中存在 upstream 读取缺陷，且不属于 clean no-paid manifest。不能以空值或示例邮箱同步，也不能只凭 env 值声称 allowlist 已生效。受控测试可以临时设置：
 
 ```bash
 ALLOW_REGISTRATION_EMAIL=you@example.com
@@ -129,7 +129,7 @@ Coze `v0.5.1` 对空值会回退到 local runner。本 wrapper 已显式覆盖�
 
 ## 模型不可用
 
-最小文本 Agent 需要模型配置：
+clean no-paid profile 故意不登记模型/provider Variables；它可以启动页面和本地基础服务，但不会启用文本 Agent 的模型调用。需要模型能力时，应建立完整的 provider-enabled 配置，而不是向 clean profile 写入空值或占位值：
 
 ```text
 MODEL_PROTOCOL_0
@@ -164,7 +164,7 @@ bucket 挂载上的 IO 比本地盘慢，Milvus proxy 就绪时间会变长。Co
 
 ## 文件上传 URL 模型不可读
 
-本地 MinIO fallback 只为 P0/P1 演示保留。真实上传、多模态或模型可读 URL 建议配置 S3/TOS/ImageX：
+clean no-paid profile 默认使用 `STORAGE_TYPE=minio` 和本地 MinIO，不需要 S3 endpoint/region Variables。本地 MinIO fallback 只为 P0/P1 演示保留；真实上传、多模态或模型可读 URL 建议建立完整的 S3/TOS/ImageX 扩展配置：
 
 ```text
 FILE_UPLOAD_COMPONENT_TYPE=storage
@@ -179,7 +179,7 @@ STORAGE_BUCKET
 
 ## Knowledge/RAG 初始化失败
 
-Coze 启动阶段会初始化 ES 和 Vector Store。本包装仓默认内置 ES + Milvus；若改用外部托管服务，配置对应 HF Variables/Secrets：
+Coze 启动阶段会初始化 ES 和 Vector Store。clean no-paid profile 默认使用 `ES_ADDR=http://127.0.0.1:9200` 与 `VECTOR_STORE_TYPE=milvus`，不需要 VikingDB endpoint Variables；若改用外部托管服务，再建立完整的 HF Variables/Secrets 扩展配置：
 
 ```text
 ES_ADDR

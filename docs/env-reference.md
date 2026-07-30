@@ -4,13 +4,16 @@
 
 远端 Settings、Space visibility、mount 与 Secret presence 必须在实际发布窗口重新只读回读；本文不把历史盘点当作当前部署事实。
 
+## Clean no-paid profile
+
+`hfs-dev.toml` 和 candidate manifest 只登记具有安全非空语义的基础运行键。clean no-paid profile 不创建注册 allowlist、模型/provider tuple、外部 S3 endpoint/region 或外部 VikingDB endpoint/region/scheme 的空值和占位值。未设置这些扩展项时，`render-env.sh` 仍会生成完整 runtime env：文件存储使用本地 MinIO，搜索使用本地 Elasticsearch，向量存储使用本地 Milvus；模型/provider tuple 不会形成可用配置，因此不会凭空启用需要付费或外部凭据的业务能力。
+
 ## 推荐 HF Variables
 
 | Key | 默认值 | 建议 | 说明 |
 | --- | --- | --- | --- |
 | `COZE_RUNTIME_MANIFEST_URI` | 空 | artifact runtime 必填 | 直接 HTTPS manifest URL；不得带 query、fragment 或嵌入凭据。bootstrap 只读取一次，按 manifest 下载同目录的 按 source commit 命名的 `BUILD_SOURCE-<commit>.json`、server、web。 |
 | `DISABLE_USER_REGISTRATION` | `true` | `true` | 公开 Space 默认关闭注册。 |
-| `ALLOW_REGISTRATION_EMAIL` | 空 | 按需填写并做注册 smoke | `v0.5.1` fresh fallback config 存在 upstream 读取缺陷，不能只凭 env 值确认 allowlist 生效；含个人邮箱时不写公开 PR 文案。 |
 | `ENABLE_LOCAL_MINIO` | `1` | P0/P1 可保留 `1` | 本地 MinIO fallback；设为 `0` 时必须提供外部 object storage，并确保内置 Milvus 可访问 `MINIO_ADDRESS`。 |
 | `COZE_PUBLIC_URL` | 从 `SPACE_HOST` 推导 | `https://blueskyxn-coze-all-in-one-hfs.hf.space` | 公开 URL；自定义域名时显式覆盖。 |
 | `LOG_LEVEL` | `info` | `info` | Coze Server 日志级别。 |
@@ -40,10 +43,13 @@
 | `VIKING_DB_AK` / `VIKING_DB_SK` | VikingDB 凭据 | 使用 VikingDB vector store 时配置。 |
 | `TOS_ACCESS_KEY` / `TOS_SECRET_KEY` | 火山 TOS 凭据 | 使用 TOS 时配置。 |
 
-## 可放 HF Variables 的非敏感 Provider 配置
+## 按需外接配置
 
-| Key | 示例 | 说明 |
+以下配置不是 clean no-paid profile 的必需项。selector 类键可以保留安全的本地默认值；注册 allowlist、模型/provider、S3 endpoint 和 VikingDB endpoint 相关键不登记在 clean manifests，也不应以空值、个人信息或示例 endpoint 同步。只有建立完整、经批准的扩展 profile 时才设置；私有 endpoint 与凭据放 HF Secrets。
+
+| Key | 扩展 profile 示例 | 说明 |
 | --- | --- | --- |
+| `ALLOW_REGISTRATION_EMAIL` | `user@example.com` | 仅限受控注册测试；`v0.5.1` fresh fallback config 存在 upstream 读取缺陷，必须做真实注册 smoke，且不写入公开 PR、截图或 clean manifest。 |
 | `MODEL_PROTOCOL_0` | `openai` | 模型协议。 |
 | `MODEL_OPENCOZE_ID_0` | `100001` | Coze 内部模型 ID。 |
 | `MODEL_NAME_0` | `example-model` | 页面显示名。 |

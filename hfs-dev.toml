@@ -9,6 +9,8 @@ lane = "artifact"
 version_source = "commit"
 project_class = "preview"
 target_role = "primary"
+space_visibility = "protected"
+bucket_visibility = "private"
 env_file = ".env"
 secret_files = []
 
@@ -19,6 +21,8 @@ local_only = ["HF_TOKEN", "GH_TOKEN"]
 secrets = [
   "COZE_RUNTIME_DOWNLOAD_TOKEN",
   "OPS_TOKEN",
+]
+optional_secrets = [
   "ADMIN_TOKEN",
   "ADMIN_CSRF_KEY",
   "MODEL_API_KEY_0",
@@ -35,7 +39,6 @@ secrets = [
 variables = [
   "COZE_RUNTIME_MANIFEST_URI",
   "DISABLE_USER_REGISTRATION",
-  "ALLOW_REGISTRATION_EMAIL",
   "ENABLE_LOCAL_MINIO",
   "COZE_PUBLIC_URL",
   "LOG_LEVEL",
@@ -45,26 +48,12 @@ variables = [
   "CODE_RUNNER_TIMEOUT_SECONDS",
   "CODE_RUNNER_MEMORY_LIMIT_MB",
   "ADMIN_ENABLED",
-  "MODEL_PROTOCOL_0",
-  "MODEL_OPENCOZE_ID_0",
-  "MODEL_NAME_0",
-  "MODEL_ID_0",
-  "MODEL_BASE_URL_0",
-  "BUILTIN_CM_TYPE",
-  "BUILTIN_CM_OPENAI_BASE_URL",
-  "BUILTIN_CM_OPENAI_MODEL",
   "FILE_UPLOAD_COMPONENT_TYPE",
   "STORAGE_TYPE",
-  "S3_ENDPOINT",
-  "S3_BUCKET_ENDPOINT",
-  "S3_REGION",
   "STORAGE_BUCKET",
   "ES_ADDR",
   "ES_VERSION",
   "VECTOR_STORE_TYPE",
-  "VIKING_DB_HOST",
-  "VIKING_DB_REGION",
-  "VIKING_DB_SCHEME",
 ]
 
 dist_bucket = "hfs-dist"

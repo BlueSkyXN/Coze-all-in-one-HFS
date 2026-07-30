@@ -38,8 +38,11 @@ git diff --check
 `.env` 是 HFS 唯一的本机明文事实源，不提交、不上传、不写入公开 docs。Secret 必须先在该文件中落盘，再写入 Space；`.env.local` 只保留本地运行兼容。发布前只核对 key 分类：
 
 - HF Variables：非敏感运行策略，如 `DISABLE_USER_REGISTRATION`、`ENABLE_LOCAL_MINIO`、`COZE_PUBLIC_URL`。
-- HF Secrets：`OPS_TOKEN`、按需开启时的 `ADMIN_TOKEN` / `ADMIN_CSRF_KEY`、模型、Embedding、S3、ES、Vector、OCR、rerank、第三方 API 的 token/key/password。
+- Required HF Secrets：`COZE_RUNTIME_DOWNLOAD_TOKEN`、`OPS_TOKEN`。
+- Optional HF Secrets：按需开启时的 `ADMIN_TOKEN` / `ADMIN_CSRF_KEY`、模型、Embedding、S3、ES、Vector、OCR、rerank、第三方 API 的 token/key/password。clean non-paid profile 留空；同步时不视为缺失，prune 仍保留登记过的远端可选键。
 - 平台注入项：`SPACE_HOST`、`SPACE_ID` 等不要手动配置。
+
+clean no-paid profile 不登记没有安全非空值的注册 allowlist、模型/provider tuple、外部 S3 endpoint/region 或外部 VikingDB endpoint/region/scheme Variables；不要用空值、个人信息或占位 endpoint 填充 Settings。未配置这些扩展项时，runtime defaults 保持本地 MinIO、Elasticsearch 与 Milvus 路径，模型/provider tuple 不会形成可用配置。
 
 `ENABLE_LOCAL_MINIO=0` 只适合已经提供外部 object storage 的场景。只要继续使用内置 Milvus，就必须保证 `MINIO_ADDRESS` 指向一个 Milvus 可访问的对象存储 endpoint，并提前准备好 `MINIO_BUCKET_NAME` 对应 bucket。
 

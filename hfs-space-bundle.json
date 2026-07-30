@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "wrapper_repository": "https://github.com/BlueSkyXN/Coze-all-in-one-HFS",
+  "profiles": {
+    "formal": {
+      "manifest": "hfs-dev.toml",
+      "space": "BlueSkyXN/Coze-all-in-one-HFS"
+    },
+    "candidate": {
+      "manifest": "hfs-dev.candidate.toml",
+      "space": "BlueSkyXN/Coze-all-in-one-HFS-v2-candidate"
+    }
+  },
+  "source_to_bundle": {
+    ".dockerignore": ".dockerignore",
+    ".gitattributes": ".gitattributes",
+    "Dockerfile": "Dockerfile",
+    "LICENSE": "LICENSE",
+    "README.md": "README.md",
+    "hfs/bin/admin_service.py": "hfs/bin/admin_service.py",
+    "hfs/bin/bootstrap_runtime.py": "hfs/bin/bootstrap_runtime.py",
+    "hfs/bin/entrypoint.sh": "hfs/bin/entrypoint.sh",
+    "hfs/bin/healthcheck.sh": "hfs/bin/healthcheck.sh",
+    "hfs/bin/init-elasticsearch.sh": "hfs/bin/init-elasticsearch.sh",
+    "hfs/bin/init-minio.sh": "hfs/bin/init-minio.sh",
+    "hfs/bin/mysql-init.sh": "hfs/bin/mysql-init.sh",
+    "hfs/bin/ops_service.py": "hfs/bin/ops_service.py",
+    "hfs/bin/render-env.sh": "hfs/bin/render-env.sh",
+    "hfs/bin/run-admin-service.sh": "hfs/bin/run-admin-service.sh",
+    "hfs/bin/run-coze-server.sh": "hfs/bin/run-coze-server.sh",
+    "hfs/bin/run-elasticsearch.sh": "hfs/bin/run-elasticsearch.sh",
+    "hfs/bin/run-etcd.sh": "hfs/bin/run-etcd.sh",
+    "hfs/bin/run-mariadb.sh": "hfs/bin/run-mariadb.sh",
+    "hfs/bin/run-milvus.sh": "hfs/bin/run-milvus.sh",
+    "hfs/bin/run-minio.sh": "hfs/bin/run-minio.sh",
+    "hfs/bin/run-ops-service.sh": "hfs/bin/run-ops-service.sh",
+    "hfs/bin/wait-for.sh": "hfs/bin/wait-for.sh",
+    "hfs/conf/nats-server.conf": "hfs/conf/nats-server.conf",
+    "hfs/conf/nginx.conf": "hfs/conf/nginx.conf",
+    "hfs/conf/redis.conf": "hfs/conf/redis.conf",
+    "hfs/conf/supervisord.conf": "hfs/conf/supervisord.conf"
+  }
+}

@@ -265,8 +265,9 @@ jobs:
           python-version: "3.11"
       - name: Install pinned Hugging Face CLI
         run: |
-          python3 -m pip install --disable-pip-version-check "huggingface_hub==1.5.0" "click==8.3.1"
+          python3 -m pip install --disable-pip-version-check "huggingface_hub==1.25.1" "click==8.4.2"
           python3 -m huggingface_hub.cli.hf version
+          python3 -m huggingface_hub.cli.hf repos settings --help | grep -- --protected
       - name: Publish artifact-first, read back, then write edge manifest
         shell: bash
         env:
@@ -296,6 +297,9 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
       - name: Download verified runtime set
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
@@ -333,8 +337,9 @@ jobs:
           python-version: "3.11"
       - name: Install pinned Hugging Face CLI
         run: |
-          python3 -m pip install --disable-pip-version-check "huggingface_hub==1.5.0" "click==8.3.1"
+          python3 -m pip install --disable-pip-version-check "huggingface_hub==1.25.1" "click==8.4.2"
           python3 -m huggingface_hub.cli.hf version
+          python3 -m huggingface_hub.cli.hf repos settings --help | grep -- --protected
       - name: Download and verify the archived release
         shell: bash
         env:
@@ -343,8 +348,38 @@ jobs:
         run: |
           set -euo pipefail
           mkdir runtime-artifacts
+          gh release view "$RELEASE_TAG" --json tagName,targetCommitish,assets > "$RUNNER_TEMP/coze-release-metadata.json"
           gh release download "$RELEASE_TAG" --dir runtime-artifacts
           python3 scripts/verify-runtime-artifacts.py --manifest runtime-artifacts/manifest.json --artifacts-dir runtime-artifacts
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          root = Path("runtime-artifacts")
+          metadata = json.loads(Path(os.environ["RUNNER_TEMP"], "coze-release-metadata.json").read_text(encoding="utf-8"))
+          manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+          build_source_name = manifest["build_source"]
+          build_source = json.loads((root / build_source_name).read_text(encoding="utf-8"))
+          if metadata.get("targetCommitish") != build_source.get("wrapper_ref"):
+              raise SystemExit("release target commit does not match BUILD_SOURCE wrapper_ref")
+          ref = manifest["source_ref"]
+          expected_assets = {
+              "manifest.json",
+              build_source_name,
+              f"coze-server-app-{ref}.tar.gz",
+              f"coze-web-dist-{ref}.tar.gz",
+          }
+          actual_assets = {
+              asset.get("name")
+              for asset in metadata.get("assets", [])
+              if isinstance(asset, dict)
+          }
+          if actual_assets != expected_assets:
+              raise SystemExit("GitHub Release asset inventory does not match the verified runtime set")
+          if {path.name for path in root.iterdir() if path.is_file()} != expected_assets:
+              raise SystemExit("downloaded GitHub Release files do not match its verified asset inventory")
+          PY
       - name: Publish artifact-first, read back, then write release manifest
         shell: bash
         env:
